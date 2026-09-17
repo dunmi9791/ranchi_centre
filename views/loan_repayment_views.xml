@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_loan_repayment_list" model="ir.ui.view">
+        <field name="name">ranchi.loan.repayment.list</field>
+        <field name="model">ranchi.loan.repayment</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false">
+                <field name="date"/>
+                <field name="loan_id"/>
+                <field name="installment_id"/>
+                <field name="member_id"/>
+                <field name="union_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="source"/>
+                <field name="collection_id" optional="show"/>
+                <field name="move_id" optional="hide" groups="account.group_account_readonly"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_repayment_search" model="ir.ui.view">
+        <field name="name">ranchi.loan.repayment.search</field>
+        <field name="model">ranchi.loan.repayment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="loan_id"/>
+                <field name="member_id"/>
+                <field name="union_id"/>
+                <filter name="date" string="Date" date="date"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_source" string="Source" context="{'group_by': 'source'}"/>
+                    <filter name="group_date" string="Month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_repayment_pivot" model="ir.ui.view">
+        <field name="name">ranchi.loan.repayment.pivot</field>
+        <field name="model">ranchi.loan.repayment</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="union_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_ranchi_loan_repayment" model="ir.actions.act_window">
+        <field name="name">Repayments</field>
+        <field name="res_model">ranchi.loan.repayment</field>
+        <field name="view_mode">list,pivot</field>
+    </record>
+</odoo>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="demo_loan_type_weekly" model="ranchi.loan.type">
+            <field name="name">Market Trader Weekly</field>
+            <field name="code">MTW</field>
+            <field name="service_rate">10.0</field>
+            <field name="service_collection">spread</field>
+            <field name="admin_charge">1000.0</field>
+            <field name="risk_premium_rate">1.0</field>
+            <field name="installment_count">20</field>
+            <field name="installment_period">weekly</field>
+            <field name="grace_days">2</field>
+            <field name="min_amount">20000.0</field>
+            <field name="max_amount">500000.0</field>
+        </record>
+        <record id="demo_loan_stage_1" model="ranchi.loan.stage">
+            <field name="name">First cycle</field>
+            <field name="sequence">1</field>
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="max_principal">50000.0</field>
+            <field name="min_cycle">0</field>
+        </record>
+        <record id="demo_loan_stage_2" model="ranchi.loan.stage">
+            <field name="name">Second cycle</field>
+            <field name="sequence">2</field>
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="max_principal">100000.0</field>
+            <field name="min_cycle">1</field>
+        </record>
+        <record id="demo_loan_stage_3" model="ranchi.loan.stage">
+            <field name="name">Third cycle and above</field>
+            <field name="sequence">3</field>
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="max_principal">250000.0</field>
+            <field name="min_cycle">2</field>
+        </record>
+        <record id="demo_loan_type_monthly" model="ranchi.loan.type">
+            <field name="name">Small Business Monthly</field>
+            <field name="code">SBM</field>
+            <field name="service_rate">15.0</field>
+            <field name="service_collection">upfront</field>
+            <field name="admin_charge">2500.0</field>
+            <field name="risk_premium_rate">2.0</field>
+            <field name="installment_count">6</field>
+            <field name="installment_period">monthly</field>
+            <field name="grace_days">5</field>
+        </record>
+
+        <record id="demo_savings_rate" model="ranchi.savings.rate">
+            <field name="name">Standard savings rate</field>
+            <field name="rate_type">flat</field>
+            <field name="annual_rate">4.0</field>
+            <field name="active_from" eval="time.strftime('%Y-01-01')"/>
+        </record>
+
+        <record id="demo_union_garki" model="ranchi.union">
+            <field name="name">Garki Market Traders</field>
+            <field name="union_day">1</field>
+            <field name="meeting_venue">Garki Model Market, Block C</field>
+        </record>
+        <record id="demo_union_wuse" model="ranchi.union">
+            <field name="name">Wuse Zone 5 Women</field>
+            <field name="union_day">3</field>
+            <field name="meeting_venue">Wuse Zone 5 community hall</field>
+        </record>
+
+        <record id="demo_member_amina" model="res.partner">
+            <field name="name">Amina Bello</field>
+            <field name="phone">+234 803 000 0001</field>
+            <field name="is_ranchi_member" eval="True"/>
+            <field name="union_id" ref="demo_union_garki"/>
+            <field name="nin">12345678901</field>
+            <field name="type_items">Foodstuff and grains</field>
+            <field name="building_type">shop</field>
+            <field name="next_of_kin">Musa Bello</field>
+            <field name="next_of_kin_phone">+234 803 000 0011</field>
+        </record>
+        <record id="demo_member_chika" model="res.partner">
+            <field name="name">Chika Okafor</field>
+            <field name="phone">+234 803 000 0002</field>
+            <field name="is_ranchi_member" eval="True"/>
+            <field name="union_id" ref="demo_union_garki"/>
+            <field name="bvn">22233344455</field>
+            <field name="type_items">Fabrics</field>
+            <field name="building_type">shop</field>
+        </record>
+        <record id="demo_member_fatima" model="res.partner">
+            <field name="name">Fatima Yusuf</field>
+            <field name="phone">+234 803 000 0003</field>
+            <field name="is_ranchi_member" eval="True"/>
+            <field name="union_id" ref="demo_union_wuse"/>
+            <field name="nin">98765432109</field>
+            <field name="type_items">Provisions</field>
+            <field name="building_type">apartment</field>
+        </record>
+    </data>
+</odoo>

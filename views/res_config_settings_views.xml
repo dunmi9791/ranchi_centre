@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_ranchi" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.ranchi</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="60"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Ranchi Centre" string="Ranchi Centre" name="ranchi_centre" groups="ranchi_centre.group_ranchi_manager">
+                    <block title="Branch" name="ranchi_branch">
+                        <setting string="Branch Code" help="Prefix of member numbers, e.g. ABJ/M000001.">
+                            <field name="ranchi_branch_code"/>
+                        </setting>
+                        <setting string="One active loan per member" help="Block a new application while the member has a loan that is applied, approved or disbursed.">
+                            <field name="ranchi_one_active_loan"/>
+                        </setting>
+                    </block>
+                    <block title="Accounts" name="ranchi_accounts">
+                        <setting string="Loans Receivable" help="Asset account, must allow reconciliation. Principal and service charge are booked here at disbursement.">
+                            <field name="ranchi_loan_receivable_account_id"/>
+                        </setting>
+                        <setting string="Service Charge Income" help="Credited at disbursement when the service charge is spread over the installments.">
+                            <field name="ranchi_service_income_account_id"/>
+                        </setting>
+                        <setting string="Member Savings Liability" help="Partner balances on this account are the members' savings.">
+                            <field name="ranchi_savings_liability_account_id"/>
+                        </setting>
+                        <setting string="Withdrawal Fee Income">
+                            <field name="ranchi_fee_income_account_id"/>
+                        </setting>
+                        <setting string="Savings Interest Expense">
+                            <field name="ranchi_interest_expense_account_id"/>
+                        </setting>
+                        <setting string="Loan Write-off Account">
+                            <field name="ranchi_writeoff_account_id"/>
+                        </setting>
+                    </block>
+                    <block title="Journals" name="ranchi_journals">
+                        <setting string="Disbursement Journal" help="Bank or cash journal the loan principal leaves from.">
+                            <field name="ranchi_disbursement_journal_id"/>
+                        </setting>
+                        <setting string="Default Collection Journal" help="Proposed on collections, deposits and payouts.">
+                            <field name="ranchi_collection_journal_id"/>
+                        </setting>
+                        <setting string="Savings Adjustments Journal" help="Miscellaneous journal for interest, fees and write-offs.">
+                            <field name="ranchi_savings_journal_id"/>
+                        </setting>
+                        <setting string="Fee Invoices Journal" help="Sales journal for membership and loan fee invoices.">
+                            <field name="ranchi_fee_journal_id"/>
+                        </setting>
+                    </block>
+                    <block title="Membership" name="ranchi_membership">
+                        <setting string="Membership Fee">
+                            <field name="ranchi_membership_fee"/>
+                        </setting>
+                        <setting string="Membership Fee Product">
+                            <field name="ranchi_membership_product_id"/>
+                        </setting>
+                        <setting string="Vet automatically" help="Move the member from Applied to Vetted as soon as the membership fee invoice is paid.">
+                            <field name="ranchi_auto_vet_on_fee"/>
+                        </setting>
+                    </block>
+                    <block title="Loan Fee Products" name="ranchi_loan_products">
+                        <setting string="Administration Fee Product">
+                            <field name="ranchi_admin_fee_product_id"/>
+                        </setting>
+                        <setting string="Risk Premium Product">
+                            <field name="ranchi_risk_premium_product_id"/>
+                        </setting>
+                        <setting string="Service Charge Product" help="Used when a loan type collects the service charge up front.">
+                            <field name="ranchi_service_charge_product_id"/>
+                        </setting>
+                    </block>
+                    <block title="Savings" name="ranchi_savings">
+                        <setting string="Minimum Balance" help="A withdrawal request cannot bring the available savings below this amount.">
+                            <field name="ranchi_savings_min_balance"/>
+                        </setting>
+                        <setting string="Withdrawal Fee (%)">
+                            <field name="ranchi_withdrawal_fee_percent"/>
+                        </setting>
+                        <setting string="Withdrawal Flat Fee">
+                            <field name="ranchi_withdrawal_flat_fee"/>
+                        </setting>
+                        <setting string="Approval Levels">
+                            <field name="ranchi_withdrawal_approval_levels"/>
+                        </setting>
+                    </block>
+                    <block title="Disbursement Gateway" name="ranchi_gateway">
+                        <setting string="Provider">
+                            <field name="ranchi_disbursement_provider"/>
+                        </setting>
+                        <setting string="Flutterwave" invisible="ranchi_disbursement_provider != 'flutterwave'" help="Webhook URL: /ranchi/webhook/flutterwave">
+                            <div class="content-group">
+                                <div class="row mt8">
+                                    <label for="ranchi_flutterwave_secret_key" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_flutterwave_secret_key" password="True"/>
+                                </div>
+                                <div class="row">
+                                    <label for="ranchi_flutterwave_webhook_hash" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_flutterwave_webhook_hash" password="True"/>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting string="Monnify" invisible="ranchi_disbursement_provider != 'monnify'" help="Webhook URL: /ranchi/webhook/monnify">
+                            <div class="content-group">
+                                <div class="row mt8">
+                                    <label for="ranchi_monnify_base_url" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_monnify_base_url"/>
+                                </div>
+                                <div class="row">
+                                    <label for="ranchi_monnify_api_key" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_monnify_api_key" password="True"/>
+                                </div>
+                                <div class="row">
+                                    <label for="ranchi_monnify_secret_key" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_monnify_secret_key" password="True"/>
+                                </div>
+                                <div class="row">
+                                    <label for="ranchi_monnify_source_account" class="col-lg-4 o_light_label"/>
+                                    <field name="ranchi_monnify_source_account"/>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_ranchi_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'ranchi_centre', 'bin_size': False}</field>
+    </record>
+</odoo>

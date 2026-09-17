@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_disbursement_list" model="ir.ui.view">
+        <field name="name">ranchi.disbursement.list</field>
+        <field name="model">ranchi.disbursement</field>
+        <field name="arch" type="xml">
+            <list create="false" decoration-danger="state == 'failed'" decoration-success="state == 'done'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date_requested"/>
+                <field name="loan_id"/>
+                <field name="member_id"/>
+                <field name="union_id" optional="show"/>
+                <field name="amount" sum="Total"/>
+                <field name="provider"/>
+                <field name="account_number" optional="show"/>
+                <field name="bank_name" optional="hide"/>
+                <field name="provider_reference" optional="hide"/>
+                <field name="date_processed" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'" decoration-warning="state == 'processing'"
+                       decoration-danger="state == 'failed'" decoration-info="state == 'pending'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_disbursement_form" model="ir.ui.view">
+        <field name="name">ranchi.disbursement.form</field>
+        <field name="model">ranchi.disbursement</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <header>
+                    <button name="action_send" type="object" string="Send Transfer" class="btn-primary"
+                            invisible="state not in ('pending', 'failed')" groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_mark_done" type="object" string="Mark Paid Out" class="btn-primary"
+                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant"
+                            confirm="Confirm that the money has left the bank? This posts the disbursement entry."/>
+                    <button name="action_mark_failed" type="object" string="Mark Failed"
+                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_retry" type="object" string="Retry" invisible="state != 'failed'"
+                            groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('pending', 'failed')"
+                            groups="ranchi_centre.group_ranchi_accountant"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,processing,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Loan">
+                            <field name="loan_id" readonly="1"/>
+                            <field name="member_id"/>
+                            <field name="union_id"/>
+                            <field name="amount" readonly="state != 'pending'"/>
+                            <field name="journal_id" readonly="state not in ('pending', 'failed')"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                        <group string="Beneficiary">
+                            <field name="provider" readonly="state not in ('pending', 'failed')"/>
+                            <field name="bank_account_id" readonly="state not in ('pending', 'failed')"
+                                   context="{'default_partner_id': member_id}"/>
+                            <field name="account_number"/>
+                            <field name="bank_name"/>
+                            <field name="bank_code" readonly="state not in ('pending', 'failed')"/>
+                            <field name="narration" readonly="state not in ('pending', 'failed')"/>
+                        </group>
+                    </group>
+                    <group string="Gateway" invisible="provider == 'manual'">
+                        <group>
+                            <field name="provider_reference"/>
+                            <field name="provider_status"/>
+                        </group>
+                        <group>
+                            <field name="date_sent"/>
+                            <field name="date_processed"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="error_message" invisible="not error_message"/>
+                        <field name="move_id" invisible="not move_id" groups="account.group_account_readonly"/>
+                    </group>
+                    <notebook invisible="provider == 'manual'">
+                        <page string="Webhook Events" name="events">
+                            <field name="event_ids" readonly="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="event_type"/>
+                                    <field name="state"/>
+                                    <field name="error_message"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ranchi_disbursement_search" model="ir.ui.view">
+        <field name="name">ranchi.disbursement.search</field>
+        <field name="model">ranchi.disbursement</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="loan_id"/>
+                <field name="member_id"/>
+                <field name="provider_reference"/>
+                <filter name="pending" string="Pending" domain="[('state', '=', 'pending')]"/>
+                <filter name="processing" string="Processing" domain="[('state', '=', 'processing')]"/>
+                <filter name="failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <filter name="done" string="Paid Out" domain="[('state', '=', 'done')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_provider" string="Provider" context="{'group_by': 'provider'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ranchi_disbursement" model="ir.actions.act_window">
+        <field name="name">Disbursements</field>
+        <field name="res_model">ranchi.disbursement</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_pending': 1, 'search_default_processing': 1, 'search_default_failed': 1}</field>
+    </record>
+</odoo>

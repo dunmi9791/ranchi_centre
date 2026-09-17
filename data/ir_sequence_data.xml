@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_ranchi_union" model="ir.sequence">
+            <field name="name">Ranchi Union</field>
+            <field name="code">ranchi.union</field>
+            <field name="prefix">UN/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_member" model="ir.sequence">
+            <field name="name">Ranchi Member Number</field>
+            <field name="code">ranchi.member</field>
+            <field name="prefix">M</field>
+            <field name="padding">6</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_loan" model="ir.sequence">
+            <field name="name">Ranchi Loan</field>
+            <field name="code">ranchi.loan</field>
+            <field name="prefix">LOAN/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_collection" model="ir.sequence">
+            <field name="name">Ranchi Collection</field>
+            <field name="code">ranchi.collection</field>
+            <field name="prefix">COL/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_savings_transaction" model="ir.sequence">
+            <field name="name">Ranchi Savings Transaction</field>
+            <field name="code">ranchi.savings.transaction</field>
+            <field name="prefix">ST/%(year)s/</field>
+            <field name="padding">6</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_withdrawal_request" model="ir.sequence">
+            <field name="name">Ranchi Withdrawal Request</field>
+            <field name="code">ranchi.withdrawal.request</field>
+            <field name="prefix">WR/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_disbursement" model="ir.sequence">
+            <field name="name">Ranchi Disbursement</field>
+            <field name="code">ranchi.disbursement</field>
+            <field name="prefix">DISB/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_ranchi_lapse" model="ir.sequence">
+            <field name="name">Ranchi Lapse Adjustment</field>
+            <field name="code">ranchi.lapse.adjustment</field>
+            <field name="prefix">LAP/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

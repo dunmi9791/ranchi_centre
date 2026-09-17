@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_interest_generate_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.interest.generate.wizard.form</field>
+        <field name="model">ranchi.interest.generate.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <p class="text-muted">Interest is computed once per member per month on the balance at the month end, using the rate active on that date. Members already credited for that month are skipped.</p>
+                <group>
+                    <field name="company_id" groups="base.group_multi_company"/>
+                    <field name="period_end"/>
+                </group>
+                <footer>
+                    <button name="action_generate" type="object" string="Generate Interest" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_interest_generate_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Savings Interest</field>
+        <field name="res_model">ranchi.interest.generate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,17 @@
+# -*- coding: utf-8 -*-
+from . import res_company
+from . import res_config_settings
+from . import account_move
+from . import ranchi_union
+from . import res_partner
+from . import loan_type
+from . import loan
+from . import loan_installment
+from . import loan_repayment
+from . import disbursement
+from . import savings_transaction
+from . import savings_rate
+from . import withdrawal_request
+from . import collection
+from . import lapse_adjustment
+from . import api_request

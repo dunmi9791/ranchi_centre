@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_loan_list" model="ir.ui.view">
+        <field name="name">ranchi.loan.list</field>
+        <field name="model">ranchi.loan</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="overdue_count > 0 and state == 'disbursed'" decoration-muted="state in ('cancelled', 'written_off')">
+                <field name="name"/>
+                <field name="member_id"/>
+                <field name="union_id"/>
+                <field name="loan_type_id"/>
+                <field name="date_application" optional="hide"/>
+                <field name="date_disbursed" optional="show"/>
+                <field name="amount_applied" optional="hide"/>
+                <field name="amount_approved" sum="Total"/>
+                <field name="total_repayable" optional="hide"/>
+                <field name="amount_paid" sum="Total"/>
+                <field name="balance" sum="Total"/>
+                <field name="overdue_count" optional="show"/>
+                <field name="next_due_date" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('disbursed', 'paid')"
+                       decoration-info="state in ('applied', 'approved', 'fees')"
+                       decoration-danger="state == 'written_off'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_form" model="ir.ui.view">
+        <field name="name">ranchi.loan.form</field>
+        <field name="model">ranchi.loan</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_apply" type="object" string="Submit Application" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Approve" class="btn-primary"
+                            invisible="state != 'applied'" groups="ranchi_centre.group_ranchi_manager"/>
+                    <button name="action_create_fee_invoice" type="object" string="Invoice Fees" class="btn-primary"
+                            invisible="state != 'approved' or fee_move_id" groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_view_fee_invoice" type="object" string="Fee Invoice"
+                            invisible="not fee_move_id"/>
+                    <button name="action_request_disbursement" type="object" string="Disburse" class="btn-primary"
+                            invisible="state != 'fees' or (disbursement_id and disbursement_state not in ('cancelled', 'failed'))"
+                            groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_view_disbursement" type="object" string="Disbursement"
+                            invisible="not disbursement_id"/>
+                    <button name="action_open_writeoff_wizard" type="object" string="Write Off"
+                            invisible="state != 'disbursed'" groups="ranchi_centre.group_ranchi_manager"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
+                            invisible="state not in ('applied', 'approved', 'cancelled')" groups="ranchi_centre.group_ranchi_manager"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('draft', 'applied', 'approved', 'fees')"
+                            confirm="Cancel this loan application?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,applied,approved,fees,disbursed,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_moves" type="object" class="oe_stat_button" icon="fa-book"
+                                string="Journal Entries" groups="account.group_account_readonly" invisible="not move_ids"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <field name="fee_move_id" invisible="1"/>
+                    <field name="disbursement_id" invisible="1"/>
+                    <field name="disbursement_state" invisible="1"/>
+                    <field name="move_ids" invisible="1"/>
+                    <group>
+                        <group string="Applicant">
+                            <field name="member_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="union_id"/>
+                            <field name="credit_officer_id"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Terms">
+                            <field name="loan_type_id" readonly="state not in ('draft', 'applied')" options="{'no_create': True}"/>
+                            <field name="stage_id" readonly="state not in ('draft', 'applied')" options="{'no_create': True}"/>
+                            <field name="date_application" readonly="state != 'draft'"/>
+                            <field name="amount_applied" readonly="state != 'draft'"/>
+                            <field name="amount_approved" readonly="state not in ('applied',)" invisible="state == 'draft'"/>
+                            <field name="date_first_due" readonly="state not in ('draft', 'applied')"/>
+                            <field name="date_last_due"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Computation">
+                            <field name="installment_count"/>
+                            <field name="installment_period"/>
+                            <field name="service_rate"/>
+                            <field name="service_collection"/>
+                            <field name="service_amount"/>
+                            <field name="admin_fee_amount"/>
+                            <field name="risk_premium_amount"/>
+                            <field name="fee_total"/>
+                            <field name="fee_payment_state" invisible="not fee_move_id"/>
+                        </group>
+                        <group string="Position">
+                            <field name="total_repayable"/>
+                            <field name="installment_amount"/>
+                            <field name="amount_paid"/>
+                            <field name="balance"/>
+                            <field name="amount_overdue" invisible="state != 'disbursed'"/>
+                            <field name="next_due_date" invisible="state != 'disbursed'"/>
+                            <field name="date_approval" invisible="not date_approval"/>
+                            <field name="date_disbursed" invisible="not date_disbursed"/>
+                            <field name="date_closed" invisible="not date_closed"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Schedule" name="schedule">
+                            <field name="installment_ids" readonly="1">
+                                <list decoration-danger="status == 'overdue'" decoration-success="state == 'paid'" decoration-warning="status == 'due'">
+                                    <field name="sequence" string="#"/>
+                                    <field name="date_due"/>
+                                    <field name="amount_principal" sum="Principal"/>
+                                    <field name="amount_service" sum="Service"/>
+                                    <field name="amount_total" sum="Total"/>
+                                    <field name="amount_paid" sum="Paid"/>
+                                    <field name="amount_residual" sum="Residual"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Repayments" name="repayments">
+                            <field name="repayment_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="installment_id"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="source"/>
+                                    <field name="collection_id"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Application" name="application">
+                            <group>
+                                <group>
+                                    <field name="purpose"/>
+                                    <field name="avg_monthly_income"/>
+                                    <field name="last_loan_amount"/>
+                                    <field name="last_loan_paid_date"/>
+                                </group>
+                                <group>
+                                    <field name="has_family_in_union"/>
+                                    <field name="family_member_name" invisible="not has_family_in_union"/>
+                                    <field name="is_indebted_elsewhere"/>
+                                    <field name="indebted_institution" invisible="not is_indebted_elsewhere"/>
+                                    <field name="indebted_amount" invisible="not is_indebted_elsewhere"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Guarantor" name="guarantor">
+                            <group>
+                                <group>
+                                    <field name="guarantor_name"/>
+                                    <field name="guarantor_relationship"/>
+                                    <field name="guarantor_phone" widget="phone"/>
+                                </group>
+                                <group>
+                                    <field name="guarantor_home_address"/>
+                                    <field name="guarantor_office_address"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes"/>
+                            <group invisible="state != 'written_off'">
+                                <field name="writeoff_reason"/>
+                                <field name="writeoff_move_id"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_search" model="ir.ui.view">
+        <field name="name">ranchi.loan.search</field>
+        <field name="model">ranchi.loan</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="member_id"/>
+                <field name="union_id"/>
+                <field name="loan_type_id"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="pending" string="Awaiting Approval" domain="[('state', '=', 'applied')]"/>
+                <filter name="to_disburse" string="To Disburse" domain="[('state', 'in', ('approved', 'fees'))]"/>
+                <filter name="disbursed" string="Running" domain="[('state', '=', 'disbursed')]"/>
+                <filter name="in_arrears" string="In Arrears" domain="[('state', '=', 'disbursed'), ('installment_ids.status', '=', 'overdue')]"/>
+                <filter name="paid" string="Fully Paid" domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="application_date" string="Application Date" date="date_application"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_type" string="Loan Type" context="{'group_by': 'loan_type_id'}"/>
+                    <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_kanban" model="ir.ui.view">
+        <field name="name">ranchi.loan.kanban</field>
+        <field name="model">ranchi.loan</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" quick_create="false">
+                <field name="name"/>
+                <field name="member_id"/>
+                <field name="amount_approved"/>
+                <field name="balance"/>
+                <field name="currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between">
+                            <strong><field name="name"/></strong>
+                            <field name="state" widget="badge"/>
+                        </div>
+                        <div><field name="member_id"/></div>
+                        <div class="text-muted"><field name="union_id"/></div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span>Approved: <field name="amount_approved" widget="monetary"/></span>
+                            <span>Balance: <field name="balance" widget="monetary"/></span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_pivot" model="ir.ui.view">
+        <field name="name">ranchi.loan.pivot</field>
+        <field name="model">ranchi.loan</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="union_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="amount_approved" type="measure"/>
+                <field name="balance" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_ranchi_loan" model="ir.actions.act_window">
+        <field name="name">Loans</field>
+        <field name="res_model">ranchi.loan</field>
+        <field name="view_mode">list,kanban,form,pivot</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Register the first loan application</p>
+            <p>Draft, submit, approve, invoice fees, disburse, then collect installments on union day.</p>
+        </field>
+    </record>
+</odoo>

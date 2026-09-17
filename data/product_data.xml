@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="product_category_ranchi" model="product.category">
+            <field name="name">Ranchi Fees</field>
+        </record>
+        <record id="product_membership_fee" model="product.product">
+            <field name="name">Membership Fee</field>
+            <field name="type">service</field>
+            <field name="sale_ok" eval="True"/>
+            <field name="purchase_ok" eval="False"/>
+            <field name="categ_id" ref="product_category_ranchi"/>
+            <field name="list_price">0.0</field>
+            <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        </record>
+        <record id="product_loan_admin_fee" model="product.product">
+            <field name="name">Loan Administration Fee</field>
+            <field name="type">service</field>
+            <field name="sale_ok" eval="True"/>
+            <field name="purchase_ok" eval="False"/>
+            <field name="categ_id" ref="product_category_ranchi"/>
+            <field name="list_price">0.0</field>
+            <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        </record>
+        <record id="product_risk_premium" model="product.product">
+            <field name="name">Loan Risk Premium</field>
+            <field name="type">service</field>
+            <field name="sale_ok" eval="True"/>
+            <field name="purchase_ok" eval="False"/>
+            <field name="categ_id" ref="product_category_ranchi"/>
+            <field name="list_price">0.0</field>
+            <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        </record>
+        <record id="product_service_charge" model="product.product">
+            <field name="name">Loan Service Charge</field>
+            <field name="type">service</field>
+            <field name="sale_ok" eval="True"/>
+            <field name="purchase_ok" eval="False"/>
+            <field name="categ_id" ref="product_category_ranchi"/>
+            <field name="list_price">0.0</field>
+            <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_ranchi" model="ir.module.category">
+        <field name="name">Ranchi Centre</field>
+        <field name="description">Microfinance operations: members, unions, loans and savings.</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="group_ranchi_officer" model="res.groups">
+        <field name="name">Credit Officer</field>
+        <field name="category_id" ref="module_category_ranchi"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Sees and works only the unions they are assigned to.</field>
+    </record>
+    <record id="group_ranchi_accountant" model="res.groups">
+        <field name="name">Accountant</field>
+        <field name="category_id" ref="module_category_ranchi"/>
+        <field name="implied_ids" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="comment">All branch records, posts collections, savings and disbursements.</field>
+    </record>
+    <record id="group_ranchi_manager" model="res.groups">
+        <field name="name">Branch Manager</field>
+        <field name="category_id" ref="module_category_ranchi"/>
+        <field name="implied_ids" eval="[(4, ref('group_ranchi_accountant'))]"/>
+        <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+        <field name="comment">Full access including configuration, approvals and deletion of drafts.</field>
+    </record>
+    <record id="group_ranchi_auditor" model="res.groups">
+        <field name="name">Auditor</field>
+        <field name="category_id" ref="module_category_ranchi"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Read-only access to every record in the branch.</field>
+    </record>
+
+    <!-- ===================== Multi-company rules (global) ===================== -->
+    <record id="rule_union_company" model="ir.rule">
+        <field name="name">Union: own companies</field>
+        <field name="model_id" ref="model_ranchi_union"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_loan_company" model="ir.rule">
+        <field name="name">Loan: own companies</field>
+        <field name="model_id" ref="model_ranchi_loan"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_installment_company" model="ir.rule">
+        <field name="name">Installment: own companies</field>
+        <field name="model_id" ref="model_ranchi_loan_installment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_repayment_company" model="ir.rule">
+        <field name="name">Repayment: own companies</field>
+        <field name="model_id" ref="model_ranchi_loan_repayment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_collection_company" model="ir.rule">
+        <field name="name">Collection: own companies</field>
+        <field name="model_id" ref="model_ranchi_collection"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_collection_line_company" model="ir.rule">
+        <field name="name">Collection line: own companies</field>
+        <field name="model_id" ref="model_ranchi_collection_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_savings_tx_company" model="ir.rule">
+        <field name="name">Savings transaction: own companies</field>
+        <field name="model_id" ref="model_ranchi_savings_transaction"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_withdrawal_company" model="ir.rule">
+        <field name="name">Withdrawal request: own companies</field>
+        <field name="model_id" ref="model_ranchi_withdrawal_request"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_disbursement_company" model="ir.rule">
+        <field name="name">Disbursement: own companies</field>
+        <field name="model_id" ref="model_ranchi_disbursement"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_lapse_company" model="ir.rule">
+        <field name="name">Lapse adjustment: own companies</field>
+        <field name="model_id" ref="model_ranchi_lapse_adjustment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_savings_rate_company" model="ir.rule">
+        <field name="name">Savings rate: own companies</field>
+        <field name="model_id" ref="model_ranchi_savings_rate"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_loan_type_company" model="ir.rule">
+        <field name="name">Loan type: own companies</field>
+        <field name="model_id" ref="model_ranchi_loan_type"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_gateway_event_company" model="ir.rule">
+        <field name="name">Gateway event: own companies</field>
+        <field name="model_id" ref="model_ranchi_gateway_event"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- ===================== Credit officer: only their unions ===================== -->
+    <record id="rule_union_officer" model="ir.rule">
+        <field name="name">Union: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_union"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_loan_officer" model="ir.rule">
+        <field name="name">Loan: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_loan"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_installment_officer" model="ir.rule">
+        <field name="name">Installment: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_loan_installment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('loan_id.union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_repayment_officer" model="ir.rule">
+        <field name="name">Repayment: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_loan_repayment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('loan_id.union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_collection_officer" model="ir.rule">
+        <field name="name">Collection: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_collection"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_collection_line_officer" model="ir.rule">
+        <field name="name">Collection line: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_collection_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('collection_id.union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_savings_tx_officer" model="ir.rule">
+        <field name="name">Savings transaction: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_savings_transaction"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_withdrawal_officer" model="ir.rule">
+        <field name="name">Withdrawal request: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_withdrawal_request"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_disbursement_officer" model="ir.rule">
+        <field name="name">Disbursement: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_disbursement"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('loan_id.union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_lapse_officer" model="ir.rule">
+        <field name="name">Lapse adjustment: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_lapse_adjustment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('loan_id.union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+
+    <!-- ===================== Accountant / manager / auditor: whole branch ===================== -->
+    <record id="rule_union_branch" model="ir.rule">
+        <field name="name">Union: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_union"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_loan_branch" model="ir.rule">
+        <field name="name">Loan: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_loan"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_installment_branch" model="ir.rule">
+        <field name="name">Installment: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_loan_installment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_repayment_branch" model="ir.rule">
+        <field name="name">Repayment: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_loan_repayment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_collection_branch" model="ir.rule">
+        <field name="name">Collection: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_collection"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_collection_line_branch" model="ir.rule">
+        <field name="name">Collection line: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_collection_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_savings_tx_branch" model="ir.rule">
+        <field name="name">Savings transaction: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_savings_transaction"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_withdrawal_branch" model="ir.rule">
+        <field name="name">Withdrawal request: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_withdrawal_request"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_disbursement_branch" model="ir.rule">
+        <field name="name">Disbursement: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_disbursement"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_lapse_branch" model="ir.rule">
+        <field name="name">Lapse adjustment: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_lapse_adjustment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- ===================== Portal members: own records ===================== -->
+    <record id="rule_union_portal" model="ir.rule">
+        <field name="name">Union: member sees own union</field>
+        <field name="model_id" ref="model_ranchi_union"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('member_ids', 'in', [user.partner_id.id])]</field>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_loan_portal" model="ir.rule">
+        <field name="name">Loan: member sees own loans</field>
+        <field name="model_id" ref="model_ranchi_loan"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('member_id', '=', user.partner_id.id)]</field>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_installment_portal" model="ir.rule">
+        <field name="name">Installment: member sees own installments</field>
+        <field name="model_id" ref="model_ranchi_loan_installment"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('loan_id.member_id', '=', user.partner_id.id)]</field>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_savings_tx_portal" model="ir.rule">
+        <field name="name">Savings transaction: member sees own</field>
+        <field name="model_id" ref="model_ranchi_savings_transaction"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('member_id', '=', user.partner_id.id)]</field>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_withdrawal_portal" model="ir.rule">
+        <field name="name">Withdrawal request: member sees own</field>
+        <field name="model_id" ref="model_ranchi_withdrawal_request"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('member_id', '=', user.partner_id.id)]</field>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_ranchi" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.ranchi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@id='other_tab']//group[@name='sale_info_group']" position="inside">
+                <field name="ranchi_move_type" invisible="not ranchi_move_type" readonly="1"/>
+                <field name="ranchi_loan_id" invisible="not ranchi_loan_id" readonly="1"/>
+                <field name="ranchi_member_id" invisible="not ranchi_member_id" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_move_filter_ranchi" model="ir.ui.view">
+        <field name="name">account.move.search.inherit.ranchi</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_move_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='posted']" position="after">
+                <separator/>
+                <filter name="ranchi_ops" string="Ranchi Operations" domain="[('ranchi_move_type', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

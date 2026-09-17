@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_savings_rate_list" model="ir.ui.view">
+        <field name="name">ranchi.savings.rate.list</field>
+        <field name="model">ranchi.savings.rate</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="rate_type"/>
+                <field name="annual_rate"/>
+                <field name="min_balance"/>
+                <field name="active_from"/>
+                <field name="active_to"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_savings_rate_form" model="ir.ui.view">
+        <field name="name">ranchi.savings.rate.form</field>
+        <field name="model">ranchi.savings.rate</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="rate_type"/>
+                            <field name="annual_rate" invisible="rate_type != 'flat'" required="rate_type == 'flat'"/>
+                            <field name="min_balance"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="active_from"/>
+                            <field name="active_to"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <field name="tier_ids" invisible="rate_type != 'tiered'">
+                        <list editable="bottom">
+                            <field name="amount_from"/>
+                            <field name="amount_to"/>
+                            <field name="annual_rate"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_savings_rate" model="ir.actions.act_window">
+        <field name="name">Savings Interest Rates</field>
+        <field name="res_model">ranchi.savings.rate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

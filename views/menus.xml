@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_ranchi_root" name="Ranchi Centre" sequence="35" web_icon="ranchi_centre,static/description/icon.png"
+              groups="ranchi_centre.group_ranchi_officer,ranchi_centre.group_ranchi_auditor"/>
+
+    <menuitem id="menu_ranchi_members_root" name="Members" parent="menu_ranchi_root" sequence="10"/>
+    <menuitem id="menu_ranchi_members" name="Members" parent="menu_ranchi_members_root" action="action_ranchi_members" sequence="10"/>
+    <menuitem id="menu_ranchi_unions" name="Unions" parent="menu_ranchi_members_root" action="action_ranchi_union" sequence="20"/>
+
+    <menuitem id="menu_ranchi_loans_root" name="Loans" parent="menu_ranchi_root" sequence="20"/>
+    <menuitem id="menu_ranchi_loans" name="Loans" parent="menu_ranchi_loans_root" action="action_ranchi_loan" sequence="10"/>
+    <menuitem id="menu_ranchi_installments" name="Installments" parent="menu_ranchi_loans_root" action="action_ranchi_loan_installment" sequence="20"/>
+    <menuitem id="menu_ranchi_disbursements" name="Disbursements" parent="menu_ranchi_loans_root" action="action_ranchi_disbursement" sequence="30"/>
+    <menuitem id="menu_ranchi_repayments" name="Repayments" parent="menu_ranchi_loans_root" action="action_ranchi_loan_repayment" sequence="40"/>
+
+    <menuitem id="menu_ranchi_collections_root" name="Collections" parent="menu_ranchi_root" sequence="30"/>
+    <menuitem id="menu_ranchi_collections" name="Field Collections" parent="menu_ranchi_collections_root" action="action_ranchi_collection" sequence="10"/>
+    <menuitem id="menu_ranchi_lapse" name="Lapse Adjustments" parent="menu_ranchi_collections_root" action="action_ranchi_lapse_adjustment" sequence="20"
+              groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_auditor"/>
+
+    <menuitem id="menu_ranchi_savings_root" name="Savings" parent="menu_ranchi_root" sequence="40"/>
+    <menuitem id="menu_ranchi_savings_transactions" name="Transactions" parent="menu_ranchi_savings_root" action="action_ranchi_savings_transaction" sequence="10"/>
+    <menuitem id="menu_ranchi_savings_deposit" name="Record Deposit" parent="menu_ranchi_savings_root" action="action_ranchi_savings_deposit_wizard" sequence="20"
+              groups="ranchi_centre.group_ranchi_officer"/>
+    <menuitem id="menu_ranchi_withdrawals" name="Withdrawal Requests" parent="menu_ranchi_savings_root" action="action_ranchi_withdrawal_request" sequence="30"/>
+    <menuitem id="menu_ranchi_interest" name="Generate Interest" parent="menu_ranchi_savings_root" action="action_ranchi_interest_generate_wizard" sequence="40"
+              groups="ranchi_centre.group_ranchi_accountant"/>
+
+    <menuitem id="menu_ranchi_reporting_root" name="Reporting" parent="menu_ranchi_root" sequence="50"/>
+    <menuitem id="menu_ranchi_statement" name="Savings Statement" parent="menu_ranchi_reporting_root" action="action_ranchi_savings_statement_wizard" sequence="10"/>
+
+    <menuitem id="menu_ranchi_config_root" name="Configuration" parent="menu_ranchi_root" sequence="90" groups="ranchi_centre.group_ranchi_manager"/>
+    <menuitem id="menu_ranchi_settings" name="Settings" parent="menu_ranchi_config_root" action="action_ranchi_config_settings" sequence="10"/>
+    <menuitem id="menu_ranchi_loan_types" name="Loan Types" parent="menu_ranchi_config_root" action="action_ranchi_loan_type" sequence="20"/>
+    <menuitem id="menu_ranchi_loan_stages" name="Loan Stages" parent="menu_ranchi_config_root" action="action_ranchi_loan_stage" sequence="30"/>
+    <menuitem id="menu_ranchi_savings_rates" name="Savings Interest Rates" parent="menu_ranchi_config_root" action="action_ranchi_savings_rate" sequence="40"/>
+    <menuitem id="menu_ranchi_gateway_events" name="Gateway Events" parent="menu_ranchi_config_root" action="action_ranchi_gateway_event" sequence="50"/>
+    <menuitem id="menu_ranchi_api_requests" name="API Requests" parent="menu_ranchi_config_root" action="action_ranchi_api_request" sequence="60"/>
+</odoo>

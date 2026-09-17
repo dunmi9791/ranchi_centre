@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_loan_type_list" model="ir.ui.view">
+        <field name="name">ranchi.loan.type.list</field>
+        <field name="model">ranchi.loan.type</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="service_rate"/>
+                <field name="service_collection"/>
+                <field name="admin_charge"/>
+                <field name="risk_premium_rate"/>
+                <field name="installment_count"/>
+                <field name="installment_period"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="loan_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_loan_type_form" model="ir.ui.view">
+        <field name="name">ranchi.loan.type.form</field>
+        <field name="model">ranchi.loan.type</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Market Trader Weekly"/></h1>
+                    </div>
+                    <group>
+                        <group string="Charges">
+                            <field name="code"/>
+                            <field name="service_rate"/>
+                            <field name="service_collection"/>
+                            <field name="admin_charge"/>
+                            <field name="risk_premium_rate"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group string="Repayment">
+                            <field name="installment_count"/>
+                            <field name="installment_period"/>
+                            <field name="grace_days"/>
+                            <field name="min_amount"/>
+                            <field name="max_amount"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Stages" name="stages">
+                            <field name="stage_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="max_principal"/>
+                                    <field name="min_cycle"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Description" name="description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_loan_type" model="ir.actions.act_window">
+        <field name="name">Loan Types</field>
+        <field name="res_model">ranchi.loan.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_ranchi_loan_stage_list" model="ir.ui.view">
+        <field name="name">ranchi.loan.stage.list</field>
+        <field name="model">ranchi.loan.stage</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="loan_type_id"/>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="max_principal"/>
+                <field name="min_cycle"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_ranchi_loan_stage" model="ir.actions.act_window">
+        <field name="name">Loan Stages</field>
+        <field name="res_model">ranchi.loan.stage</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

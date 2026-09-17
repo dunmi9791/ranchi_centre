@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_gateway_event_list" model="ir.ui.view">
+        <field name="name">ranchi.gateway.event.list</field>
+        <field name="model">ranchi.gateway.event</field>
+        <field name="arch" type="xml">
+            <list create="false" decoration-danger="state == 'error'" decoration-muted="state == 'ignored'">
+                <field name="create_date"/>
+                <field name="provider"/>
+                <field name="event_type"/>
+                <field name="event_id"/>
+                <field name="disbursement_id"/>
+                <field name="state" widget="badge" decoration-success="state == 'processed'" decoration-danger="state == 'error'"/>
+                <field name="error_message" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_gateway_event_form" model="ir.ui.view">
+        <field name="name">ranchi.gateway.event.form</field>
+        <field name="model">ranchi.gateway.event</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <header>
+                    <button name="action_reprocess" type="object" string="Reprocess" invisible="state != 'error'" groups="ranchi_centre.group_ranchi_manager"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="provider"/>
+                            <field name="event_type"/>
+                            <field name="event_id"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="disbursement_id"/>
+                            <field name="company_id"/>
+                            <field name="create_date"/>
+                        </group>
+                    </group>
+                    <field name="error_message" invisible="not error_message"/>
+                    <field name="payload" widget="ace" options="{'mode': 'json'}"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_gateway_event" model="ir.actions.act_window">
+        <field name="name">Gateway Events</field>
+        <field name="res_model">ranchi.gateway.event</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

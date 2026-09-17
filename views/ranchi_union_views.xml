@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_union_list" model="ir.ui.view">
+        <field name="name">ranchi.union.list</field>
+        <field name="model">ranchi.union</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="credit_officer_id"/>
+                <field name="union_day"/>
+                <field name="confirmed_member_count" string="Members"/>
+                <field name="active_loan_count" string="Active Loans"/>
+                <field name="loans_outstanding" sum="Total"/>
+                <field name="savings_total" sum="Total"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="state" widget="badge" decoration-success="state == 'active'" decoration-muted="state != 'active'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_union_form" model="ir.ui.view">
+        <field name="name">ranchi.union.form</field>
+        <field name="model">ranchi.union</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_members" type="object" class="oe_stat_button" icon="fa-users">
+                            <field name="member_count" widget="statinfo" string="Members"/>
+                        </button>
+                        <button name="action_view_loans" type="object" class="oe_stat_button" icon="fa-money">
+                            <field name="active_loan_count" widget="statinfo" string="Active Loans"/>
+                        </button>
+                        <button name="action_view_collections" type="object" class="oe_stat_button" icon="fa-briefcase" string="Collections"/>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Garki Market Traders"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="credit_officer_id"/>
+                            <field name="union_day"/>
+                            <field name="meeting_venue"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="loans_outstanding"/>
+                            <field name="savings_total"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Members" name="members">
+                            <field name="member_ids" context="{'default_union_id': id, 'default_is_ranchi_member': True, 'default_company_id': company_id}">
+                                <list>
+                                    <field name="member_number"/>
+                                    <field name="name"/>
+                                    <field name="phone"/>
+                                    <field name="membership_state" widget="badge"/>
+                                    <field name="savings_balance"/>
+                                    <field name="loans_outstanding"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="description" placeholder="Meeting place, history, remarks..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ranchi_union_search" model="ir.ui.view">
+        <field name="name">ranchi.union.search</field>
+        <field name="model">ranchi.union</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="credit_officer_id"/>
+                <filter name="active_state" string="Active" domain="[('state', '=', 'active')]"/>
+                <filter name="my_unions" string="My Unions" domain="[('credit_officer_user_id', '=', uid)]"/>
+                <separator/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                    <filter name="group_day" string="Union Day" context="{'group_by': 'union_day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ranchi_union" model="ir.actions.act_window">
+        <field name="name">Unions</field>
+        <field name="res_model">ranchi.union</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create the first union</p>
+            <p>A union is a group of members who meet on a fixed day with their credit officer.</p>
+        </field>
+    </record>
+</odoo>

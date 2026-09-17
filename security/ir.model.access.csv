@@ -1,0 +1,64 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_union_officer,ranchi.union officer,model_ranchi_union,group_ranchi_officer,1,0,0,0
+access_union_accountant,ranchi.union accountant,model_ranchi_union,group_ranchi_accountant,1,1,1,0
+access_union_manager,ranchi.union manager,model_ranchi_union,group_ranchi_manager,1,1,1,1
+access_union_auditor,ranchi.union auditor,model_ranchi_union,group_ranchi_auditor,1,0,0,0
+access_union_portal,ranchi.union portal,model_ranchi_union,base.group_portal,1,0,0,0
+access_loan_type_officer,ranchi.loan.type officer,model_ranchi_loan_type,group_ranchi_officer,1,0,0,0
+access_loan_type_manager,ranchi.loan.type manager,model_ranchi_loan_type,group_ranchi_manager,1,1,1,1
+access_loan_type_auditor,ranchi.loan.type auditor,model_ranchi_loan_type,group_ranchi_auditor,1,0,0,0
+access_loan_type_portal,ranchi.loan.type portal,model_ranchi_loan_type,base.group_portal,1,0,0,0
+access_loan_stage_officer,ranchi.loan.stage officer,model_ranchi_loan_stage,group_ranchi_officer,1,0,0,0
+access_loan_stage_manager,ranchi.loan.stage manager,model_ranchi_loan_stage,group_ranchi_manager,1,1,1,1
+access_loan_stage_auditor,ranchi.loan.stage auditor,model_ranchi_loan_stage,group_ranchi_auditor,1,0,0,0
+access_loan_officer,ranchi.loan officer,model_ranchi_loan,group_ranchi_officer,1,1,1,0
+access_loan_manager,ranchi.loan manager,model_ranchi_loan,group_ranchi_manager,1,1,1,1
+access_loan_auditor,ranchi.loan auditor,model_ranchi_loan,group_ranchi_auditor,1,0,0,0
+access_loan_portal,ranchi.loan portal,model_ranchi_loan,base.group_portal,1,0,0,0
+access_installment_officer,ranchi.loan.installment officer,model_ranchi_loan_installment,group_ranchi_officer,1,1,0,0
+access_installment_accountant,ranchi.loan.installment accountant,model_ranchi_loan_installment,group_ranchi_accountant,1,1,1,0
+access_installment_manager,ranchi.loan.installment manager,model_ranchi_loan_installment,group_ranchi_manager,1,1,1,1
+access_installment_auditor,ranchi.loan.installment auditor,model_ranchi_loan_installment,group_ranchi_auditor,1,0,0,0
+access_installment_portal,ranchi.loan.installment portal,model_ranchi_loan_installment,base.group_portal,1,0,0,0
+access_repayment_officer,ranchi.loan.repayment officer,model_ranchi_loan_repayment,group_ranchi_officer,1,0,1,0
+access_repayment_accountant,ranchi.loan.repayment accountant,model_ranchi_loan_repayment,group_ranchi_accountant,1,1,1,0
+access_repayment_manager,ranchi.loan.repayment manager,model_ranchi_loan_repayment,group_ranchi_manager,1,1,1,1
+access_repayment_auditor,ranchi.loan.repayment auditor,model_ranchi_loan_repayment,group_ranchi_auditor,1,0,0,0
+access_collection_officer,ranchi.collection officer,model_ranchi_collection,group_ranchi_officer,1,1,1,0
+access_collection_manager,ranchi.collection manager,model_ranchi_collection,group_ranchi_manager,1,1,1,1
+access_collection_auditor,ranchi.collection auditor,model_ranchi_collection,group_ranchi_auditor,1,0,0,0
+access_collection_line_officer,ranchi.collection.line officer,model_ranchi_collection_line,group_ranchi_officer,1,1,1,1
+access_collection_line_auditor,ranchi.collection.line auditor,model_ranchi_collection_line,group_ranchi_auditor,1,0,0,0
+access_savings_tx_officer,ranchi.savings.transaction officer,model_ranchi_savings_transaction,group_ranchi_officer,1,1,1,0
+access_savings_tx_manager,ranchi.savings.transaction manager,model_ranchi_savings_transaction,group_ranchi_manager,1,1,1,1
+access_savings_tx_auditor,ranchi.savings.transaction auditor,model_ranchi_savings_transaction,group_ranchi_auditor,1,0,0,0
+access_savings_tx_portal,ranchi.savings.transaction portal,model_ranchi_savings_transaction,base.group_portal,1,0,0,0
+access_savings_rate_officer,ranchi.savings.rate officer,model_ranchi_savings_rate,group_ranchi_officer,1,0,0,0
+access_savings_rate_manager,ranchi.savings.rate manager,model_ranchi_savings_rate,group_ranchi_manager,1,1,1,1
+access_savings_rate_auditor,ranchi.savings.rate auditor,model_ranchi_savings_rate,group_ranchi_auditor,1,0,0,0
+access_savings_rate_tier_officer,ranchi.savings.rate.tier officer,model_ranchi_savings_rate_tier,group_ranchi_officer,1,0,0,0
+access_savings_rate_tier_manager,ranchi.savings.rate.tier manager,model_ranchi_savings_rate_tier,group_ranchi_manager,1,1,1,1
+access_savings_rate_tier_auditor,ranchi.savings.rate.tier auditor,model_ranchi_savings_rate_tier,group_ranchi_auditor,1,0,0,0
+access_withdrawal_officer,ranchi.withdrawal.request officer,model_ranchi_withdrawal_request,group_ranchi_officer,1,1,1,0
+access_withdrawal_manager,ranchi.withdrawal.request manager,model_ranchi_withdrawal_request,group_ranchi_manager,1,1,1,1
+access_withdrawal_auditor,ranchi.withdrawal.request auditor,model_ranchi_withdrawal_request,group_ranchi_auditor,1,0,0,0
+access_withdrawal_portal,ranchi.withdrawal.request portal,model_ranchi_withdrawal_request,base.group_portal,1,0,1,0
+access_disbursement_officer,ranchi.disbursement officer,model_ranchi_disbursement,group_ranchi_officer,1,0,0,0
+access_disbursement_accountant,ranchi.disbursement accountant,model_ranchi_disbursement,group_ranchi_accountant,1,1,1,0
+access_disbursement_manager,ranchi.disbursement manager,model_ranchi_disbursement,group_ranchi_manager,1,1,1,1
+access_disbursement_auditor,ranchi.disbursement auditor,model_ranchi_disbursement,group_ranchi_auditor,1,0,0,0
+access_gateway_event_accountant,ranchi.gateway.event accountant,model_ranchi_gateway_event,group_ranchi_accountant,1,0,0,0
+access_gateway_event_manager,ranchi.gateway.event manager,model_ranchi_gateway_event,group_ranchi_manager,1,1,1,1
+access_gateway_event_auditor,ranchi.gateway.event auditor,model_ranchi_gateway_event,group_ranchi_auditor,1,0,0,0
+access_lapse_officer,ranchi.lapse.adjustment officer,model_ranchi_lapse_adjustment,group_ranchi_officer,1,0,0,0
+access_lapse_accountant,ranchi.lapse.adjustment accountant,model_ranchi_lapse_adjustment,group_ranchi_accountant,1,1,1,0
+access_lapse_manager,ranchi.lapse.adjustment manager,model_ranchi_lapse_adjustment,group_ranchi_manager,1,1,1,1
+access_lapse_auditor,ranchi.lapse.adjustment auditor,model_ranchi_lapse_adjustment,group_ranchi_auditor,1,0,0,0
+access_api_request_manager,ranchi.api.request manager,model_ranchi_api_request,group_ranchi_manager,1,1,1,1
+access_api_request_auditor,ranchi.api.request auditor,model_ranchi_api_request,group_ranchi_auditor,1,0,0,0
+access_wiz_membership_fee,ranchi.membership.fee.wizard,model_ranchi_membership_fee_wizard,group_ranchi_officer,1,1,1,1
+access_wiz_savings_deposit,ranchi.savings.deposit.wizard,model_ranchi_savings_deposit_wizard,group_ranchi_officer,1,1,1,1
+access_wiz_withdrawal_pay,ranchi.withdrawal.pay.wizard,model_ranchi_withdrawal_pay_wizard,group_ranchi_officer,1,1,1,1
+access_wiz_interest_generate,ranchi.interest.generate.wizard,model_ranchi_interest_generate_wizard,group_ranchi_accountant,1,1,1,1
+access_wiz_loan_writeoff,ranchi.loan.writeoff.wizard,model_ranchi_loan_writeoff_wizard,group_ranchi_manager,1,1,1,1
+access_wiz_savings_statement,ranchi.savings.statement.wizard,model_ranchi_savings_statement_wizard,group_ranchi_officer,1,1,1,1

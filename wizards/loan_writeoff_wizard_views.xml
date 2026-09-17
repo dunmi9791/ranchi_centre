@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_loan_writeoff_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.loan.writeoff.wizard.form</field>
+        <field name="model">ranchi.loan.writeoff.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="loan_id"/>
+                    <field name="balance"/>
+                    <field name="reason"/>
+                    <field name="currency_id" invisible="1"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Write Off" class="btn-danger"
+                            confirm="The outstanding balance will be expensed and the loan closed. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_savings_deposit_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.savings.deposit.wizard.form</field>
+        <field name="model">ranchi.savings.deposit.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <group>
+                        <field name="member_id" options="{'no_create': True}"/>
+                        <field name="amount"/>
+                        <field name="date"/>
+                    </group>
+                    <group>
+                        <field name="journal_id" options="{'no_create': True}"/>
+                        <field name="note"/>
+                        <field name="company_id" invisible="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Record Deposit" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_savings_deposit_wizard" model="ir.actions.act_window">
+        <field name="name">Record Deposit</field>
+        <field name="res_model">ranchi.savings.deposit.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

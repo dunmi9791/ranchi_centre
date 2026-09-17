@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_ranchi" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.ranchi</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header invisible="not is_ranchi_member">
+                    <button name="action_open_membership_fee_wizard" type="object" string="Collect Membership Fee"
+                            class="btn-primary" invisible="membership_state != 'applied' or membership_fee_move_id"/>
+                    <button name="action_vet_member" type="object" string="Vet"
+                            class="btn-secondary" invisible="membership_state != 'applied'"
+                            groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_confirm_member" type="object" string="Confirm Member"
+                            class="btn-primary" invisible="membership_state != 'vetted'"
+                            groups="ranchi_centre.group_ranchi_accountant"/>
+                    <button name="action_exit_member" type="object" string="Exit Member"
+                            invisible="membership_state != 'confirmed'" groups="ranchi_centre.group_ranchi_manager"
+                            confirm="The member will be marked as exited. Continue?"/>
+                    <button name="action_reset_to_applied" type="object" string="Reset to Applied"
+                            invisible="membership_state not in ('vetted', 'exited')" groups="ranchi_centre.group_ranchi_manager"/>
+                    <field name="membership_state" widget="statusbar" statusbar_visible="applied,vetted,confirmed"/>
+                </header>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_loans" type="object" class="oe_stat_button" icon="fa-money"
+                        invisible="not is_ranchi_member">
+                    <field name="loan_count" widget="statinfo" string="Loans"/>
+                </button>
+                <button name="action_view_savings_transactions" type="object" class="oe_stat_button" icon="fa-university"
+                        invisible="not is_ranchi_member">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value"><field name="savings_balance" widget="monetary"/></span>
+                        <span class="o_stat_text">Savings</span>
+                    </div>
+                </button>
+                <button name="action_view_withdrawal_requests" type="object" class="oe_stat_button" icon="fa-hand-paper-o"
+                        invisible="not is_ranchi_member" string="Withdrawals"/>
+            </xpath>
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="is_ranchi_member"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Ranchi Membership" name="ranchi_membership" invisible="not is_ranchi_member">
+                    <group>
+                        <group string="Membership">
+                            <field name="member_number"/>
+                            <field name="union_id" options="{'no_create': True}"/>
+                            <field name="credit_officer_id"/>
+                            <field name="membership_date"/>
+                            <field name="exit_date" invisible="not exit_date"/>
+                            <field name="membership_fee_move_id" invisible="not membership_fee_move_id"/>
+                            <field name="loan_cycle"/>
+                        </group>
+                        <group string="Identity &amp; Next of Kin">
+                            <field name="nin"/>
+                            <field name="bvn"/>
+                            <field name="next_of_kin"/>
+                            <field name="next_of_kin_relationship"/>
+                            <field name="next_of_kin_phone" widget="phone"/>
+                            <field name="next_of_kin_email" widget="email"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Residence Visit">
+                            <field name="landmark"/>
+                            <field name="building_type"/>
+                            <field name="years_of_occupancy"/>
+                            <field name="number_of_portraits"/>
+                        </group>
+                        <group string="Business">
+                            <field name="type_items"/>
+                            <field name="business_description"/>
+                        </group>
+                    </group>
+                    <group string="Branch visit report">
+                        <field name="occupancy_details" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Savings">
+                        <group>
+                            <field name="savings_balance"/>
+                            <field name="savings_on_hold"/>
+                            <field name="savings_available"/>
+                        </group>
+                        <group>
+                            <field name="loans_outstanding"/>
+                            <field name="active_loan_id"/>
+                            <button name="action_print_savings_statement" type="object" string="Savings Statement"
+                                    class="btn-link" icon="fa-file-pdf-o"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_ranchi_member_list" model="ir.ui.view">
+        <field name="name">res.partner.ranchi.member.list</field>
+        <field name="model">res.partner</field>
+        <field name="priority" eval="50"/>
+        <field name="arch" type="xml">
+            <list string="Members" default_order="member_number, name">
+                <field name="member_number"/>
+                <field name="name"/>
+                <field name="phone" widget="phone"/>
+                <field name="union_id"/>
+                <field name="credit_officer_id" optional="show"/>
+                <field name="membership_date" optional="hide"/>
+                <field name="savings_balance" sum="Total"/>
+                <field name="loans_outstanding" sum="Total"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="membership_state" widget="badge"
+                       decoration-success="membership_state == 'confirmed'"
+                       decoration-info="membership_state == 'vetted'"
+                       decoration-warning="membership_state == 'applied'"
+                       decoration-muted="membership_state == 'exited'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_member_search" model="ir.ui.view">
+        <field name="name">res.partner.ranchi.member.search</field>
+        <field name="model">res.partner</field>
+        <field name="priority" eval="50"/>
+        <field name="arch" type="xml">
+            <search string="Members">
+                <field name="name" filter_domain="['|', '|', ('name', 'ilike', self), ('member_number', 'ilike', self), ('phone', 'ilike', self)]" string="Member"/>
+                <field name="union_id"/>
+                <field name="credit_officer_id"/>
+                <field name="nin"/>
+                <field name="bvn"/>
+                <filter name="applied" string="Applied" domain="[('membership_state', '=', 'applied')]"/>
+                <filter name="vetted" string="Vetted" domain="[('membership_state', '=', 'vetted')]"/>
+                <filter name="confirmed" string="Confirmed" domain="[('membership_state', '=', 'confirmed')]"/>
+                <filter name="exited" string="Exited" domain="[('membership_state', '=', 'exited')]"/>
+                <separator/>
+                <filter name="with_loan" string="With Active Loan" domain="[('loan_ids.state', 'in', ('applied', 'approved', 'fees', 'disbursed'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'membership_state'}"/>
+                    <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ranchi_members" model="ir.actions.act_window">
+        <field name="name">Members</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('is_ranchi_member', '=', True)]</field>
+        <field name="context">{'default_is_ranchi_member': True, 'default_company_type': 'person', 'search_default_confirmed': 1}</field>
+        <field name="search_view_id" ref="view_ranchi_member_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_ranchi_member_list')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('base.res_partner_kanban_view')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('base.view_partner_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Register the first member</p>
+            <p>Members apply, pay the membership fee, are vetted and then confirmed with a member number.</p>
+        </field>
+    </record>
+</odoo>

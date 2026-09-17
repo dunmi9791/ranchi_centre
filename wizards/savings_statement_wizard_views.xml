@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_savings_statement_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.savings.statement.wizard.form</field>
+        <field name="model">ranchi.savings.statement.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="member_id" options="{'no_create': True}"/>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                </group>
+                <footer>
+                    <button name="action_print" type="object" string="Print" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_savings_statement_wizard" model="ir.actions.act_window">
+        <field name="name">Savings Statement</field>
+        <field name="res_model">ranchi.savings.statement.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_savings_transaction_list" model="ir.ui.view">
+        <field name="name">ranchi.savings.transaction.list</field>
+        <field name="model">ranchi.savings.transaction</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancelled'" decoration-info="type == 'hold'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="member_id"/>
+                <field name="union_id" optional="show"/>
+                <field name="type"/>
+                <field name="origin" optional="show"/>
+                <field name="amount"/>
+                <field name="signed_amount" sum="Net"/>
+                <field name="journal_id" optional="hide"/>
+                <field name="note" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="state" widget="badge" decoration-success="state == 'posted'" decoration-danger="state == 'cancelled'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_savings_transaction_form" model="ir.ui.view">
+        <field name="name">ranchi.savings.transaction.form</field>
+        <field name="model">ranchi.savings.transaction</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_post" type="object" string="Post" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'posted' or origin not in ('manual', 'api', 'interest')"
+                            groups="ranchi_centre.group_ranchi_accountant" confirm="Reverse this transaction?"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_move" type="object" class="oe_stat_button" icon="fa-book"
+                                string="Journal Entry" invisible="not move_id" groups="account.group_account_readonly"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <field name="move_id" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="member_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="union_id"/>
+                            <field name="type" readonly="state != 'draft'"/>
+                            <field name="origin"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="amount" readonly="state != 'draft'"/>
+                            <field name="journal_id" readonly="state != 'draft'" invisible="type not in ('deposit', 'withdrawal')"
+                                   required="type in ('deposit', 'withdrawal')"/>
+                            <field name="balance_after" invisible="state != 'posted'"/>
+                            <field name="note" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Links" invisible="not collection_line_id and not withdrawal_request_id and not lapse_id">
+                        <field name="collection_line_id" invisible="not collection_line_id"/>
+                        <field name="withdrawal_request_id" invisible="not withdrawal_request_id"/>
+                        <field name="lapse_id" invisible="not lapse_id"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ranchi_savings_transaction_search" model="ir.ui.view">
+        <field name="name">ranchi.savings.transaction.search</field>
+        <field name="model">ranchi.savings.transaction</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="member_id"/>
+                <field name="union_id"/>
+                <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <separator/>
+                <filter name="deposits" string="Deposits" domain="[('type', '=', 'deposit')]"/>
+                <filter name="withdrawals" string="Withdrawals" domain="[('type', '=', 'withdrawal')]"/>
+                <filter name="interest" string="Interest" domain="[('type', '=', 'interest')]"/>
+                <filter name="holds" string="Holds" domain="[('type', '=', 'hold')]"/>
+                <separator/>
+                <filter name="date" string="Date" date="date"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_member" string="Member" context="{'group_by': 'member_id'}"/>
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_type" string="Type" context="{'group_by': 'type'}"/>
+                    <filter name="group_month" string="Month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_ranchi_savings_transaction_pivot" model="ir.ui.view">
+        <field name="name">ranchi.savings.transaction.pivot</field>
+        <field name="model">ranchi.savings.transaction</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="union_id" type="row"/>
+                <field name="type" type="col"/>
+                <field name="signed_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_ranchi_savings_transaction_graph" model="ir.ui.view">
+        <field name="name">ranchi.savings.transaction.graph</field>
+        <field name="model">ranchi.savings.transaction</field>
+        <field name="arch" type="xml">
+            <graph type="line">
+                <field name="date" interval="month"/>
+                <field name="signed_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_ranchi_savings_transaction" model="ir.actions.act_window">
+        <field name="name">Savings Transactions</field>
+        <field name="res_model">ranchi.savings.transaction</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="context">{'search_default_posted': 1}</field>
+    </record>
+</odoo>

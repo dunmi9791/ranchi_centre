@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_lapse_adjustment_list" model="ir.ui.view">
+        <field name="name">ranchi.lapse.adjustment.list</field>
+        <field name="model">ranchi.lapse.adjustment</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="member_id"/>
+                <field name="loan_id"/>
+                <field name="savings_used" sum="Total"/>
+                <field name="shortfall" sum="Total"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_lapse_adjustment_form" model="ir.ui.view">
+        <field name="name">ranchi.lapse.adjustment.form</field>
+        <field name="model">ranchi.lapse.adjustment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" type="object" string="Confirm" class="btn-primary" invisible="state != 'draft'"
+                            confirm="Settle the loan from savings (and cash shortfall)? This posts a journal entry."/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_move" type="object" class="oe_stat_button" icon="fa-book"
+                                string="Journal Entry" invisible="not move_id" groups="account.group_account_readonly"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <field name="move_id" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="member_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="union_id"/>
+                            <field name="loan_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="savings_available"/>
+                            <field name="loan_balance"/>
+                            <field name="savings_used" readonly="state != 'draft'"/>
+                            <field name="shortfall"/>
+                            <field name="journal_id" readonly="state != 'draft'" invisible="shortfall &lt;= 0 and state == 'draft'"
+                                   required="shortfall > 0"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Reason for the lapse adjustment..."/>
+                    <field name="savings_transaction_id" invisible="not savings_transaction_id"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_lapse_adjustment" model="ir.actions.act_window">
+        <field name="name">Lapse Adjustments</field>
+        <field name="res_model">ranchi.lapse.adjustment</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Settle a loan from savings</p>
+            <p>Use a lapse adjustment when a member leaves or defaults: their savings pay the loan and any shortfall is collected in cash.</p>
+        </field>
+    </record>
+</odoo>

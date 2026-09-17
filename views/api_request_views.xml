@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_api_request_list" model="ir.ui.view">
+        <field name="name">ranchi.api.request.list</field>
+        <field name="model">ranchi.api.request</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false">
+                <field name="create_date"/>
+                <field name="user_id"/>
+                <field name="route"/>
+                <field name="key"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_ranchi_api_request" model="ir.actions.act_window">
+        <field name="name">API Requests</field>
+        <field name="res_model">ranchi.api.request</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

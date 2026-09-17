@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_collection_list" model="ir.ui.view">
+        <field name="name">ranchi.collection.list</field>
+        <field name="model">ranchi.collection</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="union_id"/>
+                <field name="credit_officer_id"/>
+                <field name="journal_id"/>
+                <field name="line_count" string="Members"/>
+                <field name="amount_loan_total" sum="Total"/>
+                <field name="amount_savings_total" sum="Total"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="state" widget="badge" decoration-success="state == 'posted'" decoration-info="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_collection_form" model="ir.ui.view">
+        <field name="name">ranchi.collection.form</field>
+        <field name="model">ranchi.collection</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_fill_due_installments" type="object" string="Add Members With Dues"
+                            invisible="state != 'draft' or not union_id"/>
+                    <button name="action_post" type="object" string="Post" class="btn-primary"
+                            invisible="state != 'draft'" confirm="Post this collection? Repayments and deposits will be booked."/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_move" type="object" class="oe_stat_button" icon="fa-book"
+                                string="Journal Entry" invisible="not move_id" groups="account.group_account_readonly"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <field name="move_id" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="union_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="credit_officer_id" readonly="state != 'draft'"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="journal_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Collected" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'" context="{'default_union_id': union_id}">
+                                <list editable="bottom">
+                                    <field name="union_id" column_invisible="1"/>
+                                    <field name="member_id" options="{'no_create': True}"/>
+                                    <field name="loan_id" options="{'no_create': True}"/>
+                                    <field name="loan_balance"/>
+                                    <field name="amount_due"/>
+                                    <field name="amount_loan" sum="Loan"/>
+                                    <field name="amount_savings" sum="Savings"/>
+                                    <field name="amount_total" sum="Total"/>
+                                    <field name="note" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer oe_right">
+                                <field name="amount_loan_total"/>
+                                <field name="amount_savings_total"/>
+                                <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="note"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ranchi_collection_search" model="ir.ui.view">
+        <field name="name">ranchi.collection.search</field>
+        <field name="model">ranchi.collection</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="union_id"/>
+                <field name="credit_officer_id"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
+                <filter name="today" string="Today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="date" string="Date" date="date"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                    <filter name="group_date" string="Date" context="{'group_by': 'date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_ranchi_collection_pivot" model="ir.ui.view">
+        <field name="name">ranchi.collection.pivot</field>
+        <field name="model">ranchi.collection</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="credit_officer_id" type="row"/>
+                <field name="date" interval="week" type="col"/>
+                <field name="amount_loan_total" type="measure"/>
+                <field name="amount_savings_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_ranchi_collection_graph" model="ir.ui.view">
+        <field name="name">ranchi.collection.graph</field>
+        <field name="model">ranchi.collection</field>
+        <field name="arch" type="xml">
+            <graph type="bar" stacked="True">
+                <field name="date" interval="week"/>
+                <field name="amount_loan_total" type="measure"/>
+                <field name="amount_savings_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_ranchi_collection" model="ir.actions.act_window">
+        <field name="name">Collections</field>
+        <field name="res_model">ranchi.collection</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Record the first union-day collection</p>
+            <p>One collection per union visit: repayments and savings deposits from each member, posted to one journal entry.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_savings_statement" model="ir.actions.report">
+        <field name="name">Savings Statement</field>
+        <field name="model">res.partner</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ranchi_centre.report_savings_statement</field>
+        <field name="report_file">ranchi_centre.report_savings_statement</field>
+        <field name="print_report_name">'Savings Statement - %s' % (object.name)</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <template id="report_savings_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-set="statement" t-value="statements[doc.id]"/>
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Savings Statement</h2>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <strong t-field="doc.name"/><br/>
+                                <span t-if="doc.member_number">Member No. <span t-field="doc.member_number"/></span><br/>
+                                <span t-if="doc.union_id">Union: <span t-field="doc.union_id.name"/></span><br/>
+                                <span t-if="doc.phone" t-field="doc.phone"/>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span t-if="date_from">From <span t-out="date_from" t-options="{'widget': 'date'}"/> </span>
+                                <span>to <span t-out="date_to" t-options="{'widget': 'date'}"/></span><br/>
+                                <span>Printed <span t-out="context_timestamp(datetime.datetime.now())" t-options="{'widget': 'date'}"/></span>
+                            </div>
+                        </div>
+                        <table class="table table-sm o_main_table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Reference</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Deposit</th>
+                                    <th class="text-end">Withdrawal</th>
+                                    <th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6"><strong>Opening balance</strong></td>
+                                    <td class="text-end"><strong t-out="statement['opening']" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/></td>
+                                </tr>
+                                <tr t-foreach="statement['lines']" t-as="line">
+                                    <t t-set="tx" t-value="line['tx']"/>
+                                    <td><span t-field="tx.date"/></td>
+                                    <td><span t-field="tx.name"/></td>
+                                    <td><span t-field="tx.type"/></td>
+                                    <td><span t-field="tx.note"/></td>
+                                    <td class="text-end">
+                                        <span t-if="tx.signed_amount > 0" t-out="tx.amount" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="tx.signed_amount &lt; 0" t-out="tx.amount" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end"><span t-out="line['running']" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6"><strong>Closing balance</strong></td>
+                                    <td class="text-end"><strong t-out="statement['closing']" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-muted small">Holds for pending withdrawal requests are not shown. Current available balance:
+                            <span t-out="doc.savings_available" t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
