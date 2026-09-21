@@ -14,7 +14,9 @@
                 <field name="risk_premium_rate"/>
                 <field name="installment_count"/>
                 <field name="installment_period"/>
+                <field name="meeting_frequency"/>
                 <field name="company_id" groups="base.group_multi_company"/>
+                <field name="union_count"/>
                 <field name="loan_count"/>
             </list>
         </field>
@@ -26,6 +28,11 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_unions" type="object" class="oe_stat_button" icon="fa-users">
+                            <field name="union_count" widget="statinfo" string="Unions"/>
+                        </button>
+                    </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title">
                         <label for="name"/>
@@ -44,6 +51,7 @@
                         <group string="Repayment">
                             <field name="installment_count"/>
                             <field name="installment_period"/>
+                            <field name="meeting_frequency" readonly="union_count > 0"/>
                             <field name="grace_days"/>
                             <field name="min_amount"/>
                             <field name="max_amount"/>

@@ -3,6 +3,8 @@
     <menuitem id="menu_ranchi_root" name="Ranchi Centre" sequence="35" web_icon="ranchi_centre,static/description/icon.png"
               groups="ranchi_centre.group_ranchi_officer,ranchi_centre.group_ranchi_auditor"/>
 
+    <menuitem id="menu_ranchi_dashboard" name="Dashboard" parent="menu_ranchi_root" action="action_ranchi_dashboard" sequence="1"/>
+
     <menuitem id="menu_ranchi_members_root" name="Members" parent="menu_ranchi_root" sequence="10"/>
     <menuitem id="menu_ranchi_members" name="Members" parent="menu_ranchi_members_root" action="action_ranchi_members" sequence="10"/>
     <menuitem id="menu_ranchi_unions" name="Unions" parent="menu_ranchi_members_root" action="action_ranchi_union" sequence="20"/>

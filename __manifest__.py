@@ -27,6 +27,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'data/ir_sequence_data.xml',
         'data/product_data.xml',
         'data/ir_cron_data.xml',
+        'views/dashboard_views.xml',
         'views/res_config_settings_views.xml',
         'views/ranchi_union_views.xml',
         'views/res_partner_views.xml',
@@ -53,6 +54,13 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'views/portal_templates.xml',
         'views/menus.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'ranchi_centre/static/src/dashboard/dashboard.scss',
+            'ranchi_centre/static/src/dashboard/dashboard.js',
+            'ranchi_centre/static/src/dashboard/dashboard.xml',
+        ],
+    },
     'demo': [
         'demo/ranchi_demo.xml',
     ],

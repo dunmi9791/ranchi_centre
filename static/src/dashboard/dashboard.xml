@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="ranchi_centre.Dashboard">
+        <!-- props.className carries "o_action" from the action container: it makes this root a
+             flex column so the Layout content area gets its height and scrolls. -->
+        <div t-att-class="'o_ranchi_dashboard ' + (props.className || '')">
+        <Layout display="{ controlPanel: {} }">
+            <t t-set-slot="layout-buttons">
+                <button class="btn btn-secondary" t-on-click="reload" t-att-disabled="state.loading">
+                    <i class="fa fa-refresh me-1"/>Refresh
+                </button>
+            </t>
+            <t t-set-slot="control-panel-additional-actions">
+                <span t-if="state.data" class="text-muted small ms-2">
+                    <t t-esc="state.data.company"/> · <t t-esc="state.data.today"/>
+                </span>
+            </t>
+
+            <div t-if="state.loading and !state.data" class="o_ranchi_dashboard_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+            <div t-elif="state.error" class="alert alert-danger m-3" role="alert">
+                <t t-esc="state.error"/>
+            </div>
+            <div t-else="" class="o_ranchi_dashboard_body">
+                <t t-set="d" t-value="state.data"/>
+
+                <!-- ============ headline KPIs ============ -->
+                <div class="o_ranchi_kpis">
+                    <t t-call="ranchi_centre.DashboardKpi">
+                        <t t-set="icon" t-value="'fa-users'"/>
+                        <t t-set="label" t-value="'Unions'"/>
+                        <t t-set="value" t-value="int(d.unions.total)"/>
+                        <t t-set="sub" t-value="int(d.unions.active) + ' active · ' + int(d.unions.meeting_today) + ' meeting today'"/>
+                        <t t-set="key" t-value="'unions'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DashboardKpi">
+                        <t t-set="icon" t-value="'fa-id-card-o'"/>
+                        <t t-set="label" t-value="'Members'"/>
+                        <t t-set="value" t-value="int(d.members.total)"/>
+                        <t t-set="sub" t-value="int(d.members.confirmed) + ' confirmed · ' + int(d.members.new_this_month) + ' new this month'"/>
+                        <t t-set="key" t-value="'members'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DashboardKpi">
+                        <t t-set="icon" t-value="'fa-money'"/>
+                        <t t-set="label" t-value="'Active loans'"/>
+                        <t t-set="value" t-value="int(d.loans.active)"/>
+                        <t t-set="sub" t-value="money(d.loans.outstanding) + ' outstanding'"/>
+                        <t t-set="key" t-value="'loans_active'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DashboardKpi">
+                        <t t-set="icon" t-value="'fa-university'"/>
+                        <t t-set="label" t-value="'Total savings'"/>
+                        <t t-set="value" t-value="money(d.savings.total, true)"/>
+                        <t t-set="sub" t-value="'+' + money(d.savings.deposits_this_month, true) + ' deposits this month'"/>
+                        <t t-set="key" t-value="'savings'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DashboardKpi">
+                        <t t-set="icon" t-value="'fa-exclamation-triangle'"/>
+                        <t t-set="label" t-value="'Portfolio at risk'"/>
+                        <t t-set="value" t-value="pct(d.loans.par)"/>
+                        <t t-set="sub" t-value="money(d.loans.overdue_amount, true) + ' overdue on ' + int(d.loans.overdue_loans) + ' loans'"/>
+                        <t t-set="key" t-value="'installments_overdue'"/>
+                        <t t-set="tone" t-value="d.loans.par > 5 ? 'danger' : (d.loans.par > 0 ? 'warning' : 'success')"/>
+                    </t>
+                </div>
+
+                <div class="o_ranchi_grid">
+                    <!-- ============ today ============ -->
+                    <div class="o_ranchi_card">
+                        <div class="o_ranchi_card_title">Today</div>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Unions meeting'"/>
+                            <t t-set="value" t-value="int(d.unions.meeting_today)"/>
+                            <t t-set="key" t-value="'unions_today'"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Installments due'"/>
+                            <t t-set="value" t-value="int(d.loans.due_today) + ' · ' + money(d.loans.due_today_amount, true)"/>
+                            <t t-set="key" t-value="'installments_today'"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Collections recorded'"/>
+                            <t t-set="value" t-value="int(d.collections.today) + ' · ' + money(d.collections.today_amount, true)"/>
+                            <t t-set="key" t-value="'collections_today'"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Collected this month'"/>
+                            <t t-set="value" t-value="money(d.collections.this_month, true)"/>
+                        </t>
+                    </div>
+
+                    <!-- ============ needs attention ============ -->
+                    <div class="o_ranchi_card">
+                        <div class="o_ranchi_card_title">Needs attention</div>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Loans awaiting approval'"/>
+                            <t t-set="value" t-value="int(d.loans.pending_approval)"/>
+                            <t t-set="key" t-value="'loans_pending'"/>
+                            <t t-set="badge" t-value="d.loans.pending_approval > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Approved, not yet disbursed'"/>
+                            <t t-set="value" t-value="int(d.loans.awaiting_disbursement)"/>
+                            <t t-set="key" t-value="'loans_awaiting'"/>
+                            <t t-set="badge" t-value="d.loans.awaiting_disbursement > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Disbursements pending'"/>
+                            <t t-set="value" t-value="int(d.disbursements.pending) + ' · ' + money(d.disbursements.pending_amount, true)"/>
+                            <t t-set="key" t-value="'disbursements_pending'"/>
+                            <t t-set="badge" t-value="d.disbursements.pending > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Disbursements failed'"/>
+                            <t t-set="value" t-value="int(d.disbursements.failed)"/>
+                            <t t-set="key" t-value="'disbursements_failed'"/>
+                            <t t-set="badge" t-value="d.disbursements.failed > 0"/>
+                            <t t-set="tone" t-value="'danger'"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Withdrawal requests pending'"/>
+                            <t t-set="value" t-value="int(d.savings.pending_withdrawals) + ' · ' + money(d.savings.pending_withdrawals_amount, true)"/>
+                            <t t-set="key" t-value="'withdrawals_pending'"/>
+                            <t t-set="badge" t-value="d.savings.pending_withdrawals > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Draft collections'"/>
+                            <t t-set="value" t-value="int(d.collections.draft)"/>
+                            <t t-set="key" t-value="'collections_draft'"/>
+                            <t t-set="badge" t-value="d.collections.draft > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Members applied or vetted'"/>
+                            <t t-set="value" t-value="int(d.members.applied + d.members.vetted)"/>
+                            <t t-set="key" t-value="'members_pipeline'"/>
+                            <t t-set="badge" t-value="(d.members.applied + d.members.vetted) > 0"/>
+                        </t>
+                    </div>
+
+                    <!-- ============ chart ============ -->
+                    <div class="o_ranchi_card o_ranchi_card_wide">
+                        <div class="o_ranchi_card_title">Last six months</div>
+                        <div class="o_ranchi_chart"><canvas t-ref="chart"/></div>
+                    </div>
+
+                    <!-- ============ arrears by union ============ -->
+                    <div class="o_ranchi_card">
+                        <div class="o_ranchi_card_title">Highest arrears by union</div>
+                        <div t-if="!d.top_overdue_unions.length" class="text-muted small">No overdue installments.</div>
+                        <table t-else="" class="table table-sm mb-0">
+                            <tbody>
+                                <tr t-foreach="d.top_overdue_unions" t-as="u" t-key="u.id"
+                                    class="o_ranchi_link" t-on-click="() => this.openUnion(u.id)">
+                                    <td><t t-esc="u.name"/></td>
+                                    <td class="text-end text-muted"><t t-esc="int(u.count)"/> inst.</td>
+                                    <td class="text-end fw-bold"><t t-esc="money(u.amount)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ============ unions & loans mix ============ -->
+                    <div class="o_ranchi_card">
+                        <div class="o_ranchi_card_title">Unions by loan type</div>
+                        <div t-if="!d.unions.by_loan_type.length" class="text-muted small">No unions yet.</div>
+                        <table t-else="" class="table table-sm mb-0">
+                            <tbody>
+                                <tr t-foreach="d.unions.by_loan_type" t-as="row" t-key="row.name">
+                                    <td><t t-esc="row.name"/></td>
+                                    <td class="text-muted"><t t-esc="row.frequency == 'daily' ? 'meets daily' : 'weekly'"/></td>
+                                    <td class="text-end fw-bold"><t t-esc="int(row.count)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="o_ranchi_card_title mt-3">This month</div>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Loans disbursed'"/>
+                            <t t-set="value" t-value="int(d.loans.disbursed_this_month) + ' · ' + money(d.loans.disbursed_this_month_amount, true)"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Savings withdrawn'"/>
+                            <t t-set="value" t-value="money(d.savings.withdrawals_this_month, true)"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Members with an active loan'"/>
+                            <t t-set="value" t-value="int(d.members.with_active_loan)"/>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </Layout>
+        </div>
+    </t>
+
+    <t t-name="ranchi_centre.DashboardKpi">
+        <div t-att-class="'o_ranchi_kpi ' + (tone ? 'o_ranchi_kpi_' + tone : '') + (key ? ' o_ranchi_link' : '')"
+             t-on-click="() => key ? this.open(key) : null" t-att-role="key ? 'button' : null">
+            <div class="o_ranchi_kpi_icon"><i t-att-class="'fa ' + icon"/></div>
+            <div class="o_ranchi_kpi_body">
+                <div class="o_ranchi_kpi_label"><t t-esc="label"/></div>
+                <div class="o_ranchi_kpi_value"><t t-esc="value"/></div>
+                <div class="o_ranchi_kpi_sub"><t t-esc="sub"/></div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="ranchi_centre.DashboardRow">
+        <div t-att-class="'o_ranchi_row' + (key ? ' o_ranchi_link' : '')"
+             t-on-click="() => key ? this.open(key) : null" t-att-role="key ? 'button' : null">
+            <span class="o_ranchi_row_label"><t t-esc="label"/></span>
+            <span t-att-class="'o_ranchi_row_value' + (badge ? ' badge rounded-pill text-bg-' + (tone || 'warning') : '')">
+                <t t-esc="value"/>
+            </span>
+        </div>
+    </t>
+
+</templates>

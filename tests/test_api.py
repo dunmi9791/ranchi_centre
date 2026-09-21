@@ -174,12 +174,15 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         other_officer = self.env['hr.employee'].create({'name': 'Officer Two', 'company_id': self.company.id})
         other_union = self.env['ranchi.union'].create({
             'name': 'Other Union', 'company_id': self.company.id, 'union_day': '2',
-            'credit_officer_id': other_officer.id})
+            'loan_type_id': self.loan_type.id, 'credit_officer_id': other_officer.id})
         other_member = self.env['res.partner'].create({
             'name': 'Other Member', 'is_ranchi_member': True, 'union_id': other_union.id,
             'company_id': self.company.id, 'nin': '99988877766'})
         key = self._key()
-        self.assertEqual([u['id'] for u in self._ok('/api/v1/unions', {}, key)], [self.union.id])
+        unions = self._ok('/api/v1/unions', {}, key)
+        self.assertEqual([u['id'] for u in unions], [self.union.id])
+        self.assertEqual(unions[0]['loanTypeId'], self.loan_type.id)
+        self.assertEqual(unions[0]['meetingFrequency'], 'weekly')
         self.assertNotIn(other_member.id, [m['id'] for m in self._ok('/api/v1/members', {}, key)])
         self.assertIn('error', self._rpc('/api/v1/members/create', {'name': 'X', 'unionId': other_union.id}, key=key))
         self.assertIn('error', self._rpc('/api/v1/savings/deposit', {'memberId': other_member.id, 'amount': 100.0}, key=key))

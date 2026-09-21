@@ -46,6 +46,20 @@
             <field name="installment_period">monthly</field>
             <field name="grace_days">5</field>
         </record>
+        <record id="demo_loan_type_rapid" model="ranchi.loan.type">
+            <field name="name">Rapid Daily</field>
+            <field name="code">RPD</field>
+            <field name="service_rate">8.0</field>
+            <field name="service_collection">spread</field>
+            <field name="admin_charge">500.0</field>
+            <field name="risk_premium_rate">1.0</field>
+            <field name="installment_count">30</field>
+            <field name="installment_period">daily</field>
+            <field name="meeting_frequency">daily</field>
+            <field name="grace_days">0</field>
+            <field name="min_amount">10000.0</field>
+            <field name="max_amount">100000.0</field>
+        </record>
 
         <record id="demo_savings_rate" model="ranchi.savings.rate">
             <field name="name">Standard savings rate</field>
@@ -56,13 +70,20 @@
 
         <record id="demo_union_garki" model="ranchi.union">
             <field name="name">Garki Market Traders</field>
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
             <field name="union_day">1</field>
             <field name="meeting_venue">Garki Model Market, Block C</field>
         </record>
         <record id="demo_union_wuse" model="ranchi.union">
             <field name="name">Wuse Zone 5 Women</field>
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
             <field name="union_day">3</field>
             <field name="meeting_venue">Wuse Zone 5 community hall</field>
+        </record>
+        <record id="demo_union_utako_rapid" model="ranchi.union">
+            <field name="name">Utako Rapid Traders</field>
+            <field name="loan_type_id" ref="demo_loan_type_rapid"/>
+            <field name="meeting_venue">Utako Market, Line 4</field>
         </record>
 
         <record id="demo_member_amina" model="res.partner">

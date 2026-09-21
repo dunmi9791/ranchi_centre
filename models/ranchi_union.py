@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 WEEKDAYS = [
     ('0', 'Monday'), ('1', 'Tuesday'), ('2', 'Wednesday'), ('3', 'Thursday'),
@@ -29,7 +29,16 @@ class RanchiUnion(models.Model):
         'res.users', string="Credit Officer User", related='credit_officer_id.user_id',
         store=True, readonly=True,
         help="Used by record rules so the officer only sees their own unions.")
-    union_day = fields.Selection(WEEKDAYS, string="Union Day", tracking=True)
+    loan_type_id = fields.Many2one(
+        'ranchi.loan.type', string="Loan Type", required=True, tracking=True, index=True,
+        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        help="The one loan product this union runs. Members of the union can only apply for it.")
+    meeting_frequency = fields.Selection(
+        related='loan_type_id.meeting_frequency', store=True, readonly=True)
+    union_day = fields.Selection(
+        WEEKDAYS, string="Union Day", tracking=True,
+        compute='_compute_union_day', store=True, readonly=False,
+        help="Weekday the union meets. Left empty for unions that meet daily.")
     meeting_venue = fields.Char()
     description = fields.Text()
     state = fields.Selection(
@@ -71,6 +80,44 @@ class RanchiUnion(models.Model):
             union.loans_outstanding = sum(
                 union.loan_ids.filtered(lambda l: l.state == 'disbursed').mapped('balance'))
             union.savings_total = sum(union.member_ids.mapped('savings_balance'))
+
+    @api.depends('loan_type_id')
+    def _compute_union_day(self):
+        for union in self:
+            union.union_day = False if union.loan_type_id.meeting_frequency == 'daily' else union.union_day
+
+    @api.constrains('union_day', 'loan_type_id')
+    def _check_union_day(self):
+        for union in self:
+            if not union.loan_type_id:
+                continue
+            if union.meeting_frequency == 'daily' and union.union_day:
+                raise ValidationError(_(
+                    "%(union)s runs %(type)s, which meets daily: it cannot have a union day.",
+                    union=union.name, type=union.loan_type_id.name))
+            if union.meeting_frequency == 'weekly' and not union.union_day:
+                raise ValidationError(_(
+                    "%(union)s runs %(type)s, which meets weekly: choose a union day.",
+                    union=union.name, type=union.loan_type_id.name))
+
+    @api.constrains('loan_type_id', 'company_id')
+    def _check_loan_type_company(self):
+        for union in self:
+            lt_company = union.loan_type_id.company_id
+            if lt_company and lt_company != union.company_id:
+                raise ValidationError(_("The loan type must be available in the union's branch."))
+
+    def write(self, vals):
+        if 'loan_type_id' in vals:
+            for union in self:
+                if union.loan_type_id.id == vals['loan_type_id']:
+                    continue
+                active = union.loan_ids.filtered(lambda l: l.state in ('applied', 'approved', 'fees', 'disbursed'))
+                if active:
+                    raise UserError(_(
+                        "Cannot change the loan type of %(union)s while it has %(count)s active loan(s). "
+                        "Close or cancel them first.", union=union.name, count=len(active)))
+        return super().write(vals)
 
     @api.constrains('credit_officer_id', 'company_id')
     def _check_officer_company(self):

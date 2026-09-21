@@ -3,3 +3,5 @@ from . import test_membership
 from . import test_loan_flow
 from . import test_savings
 from . import test_api
+from . import test_union_loan_type
+from . import test_dashboard

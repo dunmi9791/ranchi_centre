@@ -77,7 +77,8 @@
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group string="Terms">
-                            <field name="loan_type_id" readonly="state not in ('draft', 'applied')" options="{'no_create': True}"/>
+                            <field name="union_loan_type_id" invisible="1"/>
+                            <field name="loan_type_id" readonly="state not in ('draft', 'applied')" options="{'no_create': True, 'no_open': True}"/>
                             <field name="stage_id" readonly="state not in ('draft', 'applied')" options="{'no_create': True}"/>
                             <field name="date_application" readonly="state != 'draft'"/>
                             <field name="amount_applied" readonly="state != 'draft'"/>

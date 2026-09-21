@@ -26,7 +26,10 @@ class RanchiLoan(models.Model):
     credit_officer_id = fields.Many2one(related='union_id.credit_officer_id', store=True, readonly=True)
     loan_type_id = fields.Many2one(
         'ranchi.loan.type', string="Loan Type", required=True, tracking=True,
-        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
+        compute='_compute_loan_type_id', store=True, readonly=False, precompute=True,
+        domain="[('id', '=', union_loan_type_id)]",
+        help="Fixed by the member's union: each union runs a single loan type.")
+    union_loan_type_id = fields.Many2one(related='union_id.loan_type_id', string="Union Loan Type")
     stage_id = fields.Many2one(
         'ranchi.loan.stage', string="Loan Stage", tracking=True,
         domain="[('loan_type_id', '=', loan_type_id)]")
@@ -118,6 +121,15 @@ class RanchiLoan(models.Model):
     # ------------------------------------------------------------------
     # Computes
     # ------------------------------------------------------------------
+    @api.depends('member_id.union_id.loan_type_id')
+    def _compute_loan_type_id(self):
+        # Depends on member_id (a many2one) rather than the stored related union_id so the
+        # field stays precomputable: a union runs exactly one loan type.
+        for loan in self:
+            union_type = loan.member_id.union_id.loan_type_id
+            if union_type:
+                loan.loan_type_id = union_type
+
     @api.depends('date_application', 'loan_type_id')
     def _compute_date_first_due(self):
         for loan in self:
@@ -207,6 +219,15 @@ class RanchiLoan(models.Model):
             if loan.member_id.company_id and loan.member_id.company_id != loan.company_id:
                 raise ValidationError(_("The member belongs to another branch."))
 
+    @api.constrains('loan_type_id', 'union_id')
+    def _check_loan_type_union(self):
+        for loan in self:
+            union_type = loan.union_id.loan_type_id
+            if union_type and loan.loan_type_id != union_type:
+                raise ValidationError(_(
+                    "%(union)s runs %(type)s only: this loan cannot use %(other)s.",
+                    union=loan.union_id.name, type=union_type.name, other=loan.loan_type_id.name))
+
     @api.constrains('stage_id', 'loan_type_id')
     def _check_stage_type(self):
         for loan in self:
@@ -228,6 +249,10 @@ class RanchiLoan(models.Model):
             raise UserError(_("%s is not a confirmed member.", member.display_name))
         if not member.union_id:
             raise UserError(_("%s does not belong to a union.", member.display_name))
+        if member.union_id.loan_type_id and self.loan_type_id != member.union_id.loan_type_id:
+            raise UserError(_(
+                "%(union)s runs %(type)s only.", union=member.union_id.name,
+                type=member.union_id.loan_type_id.name))
         if self.company_id.ranchi_one_active_loan:
             others = self.search_count([
                 ('member_id', '=', member.id), ('id', '!=', self.id), ('state', 'in', ACTIVE_STATES)])

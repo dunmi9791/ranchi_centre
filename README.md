@@ -9,7 +9,8 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 | Area | Model(s) | Notes |
 |---|---|---|
 | Branch settings | `res.company`, `res.config.settings` | Accounts, journals, fee products, savings rules, gateway credentials |
-| Unions | `ranchi.union` | Credit officer (hr.employee), union day, member list, outstanding totals |
+| Dashboard | `ranchi.dashboard` (abstract) + OWL client action | Unions, members, active loans, savings, portfolio at risk, today's work, pending approvals, six-month chart, arrears by union. Read as the current user, so officers see only their unions |
+| Unions | `ranchi.union` | Credit officer (hr.employee), the one loan type the union runs, union day (weekly types only: daily types such as Rapid have none), member list, outstanding totals |
 | Members | `res.partner` | Applied -> Vetted -> Confirmed -> Exited, member number, KYC, savings balances |
 | Loan config | `ranchi.loan.type`, `ranchi.loan.stage` | Service charge, admin fee, risk premium, installments, cycle ladder |
 | Loans | `ranchi.loan`, `ranchi.loan.installment`, `ranchi.loan.repayment` | Draft -> Applied -> Approved -> Fees Paid -> Disbursed -> Fully Paid / Written Off |
@@ -41,7 +42,7 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 1. Install the module. `post_init_hook` points every company at the four fee products.
 2. Ranchi Centre > Configuration > Settings: set the six accounts and four journals, the
    membership fee, savings rules and the disbursement provider.
-3. Create loan types (and stages), a savings interest rate, unions with credit officers.
+3. Create loan types (and stages) with their meeting frequency, a savings interest rate, then unions with a loan type and credit officer. A union's loan type cannot change while it has active loans.
 4. Give users a role: Credit Officer, Accountant, Branch Manager or Auditor. A credit
    officer must be linked to an `hr.employee` with a user, and be set on their unions.
 5. For the mobile app (`../ranchi_officer`): the officer signs in with their Odoo login; the app

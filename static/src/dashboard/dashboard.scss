@@ -1,0 +1,107 @@
+.o_ranchi_dashboard {
+    .o_ranchi_dashboard_loading {
+        display: flex;
+        justify-content: center;
+        padding: 4rem;
+        color: var(--o-text-muted, #6c757d);
+    }
+
+    .o_ranchi_dashboard_body {
+        padding: 1rem;
+    }
+
+    .o_ranchi_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .o_ranchi_kpi {
+        display: flex;
+        gap: 0.9rem;
+        align-items: flex-start;
+        padding: 1rem;
+        background: var(--o-view-background-color, #fff);
+        border: 1px solid var(--o-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        border-left-width: 4px;
+        border-left-color: var(--o-brand-primary, #714b67);
+
+        &.o_ranchi_kpi_success { border-left-color: #28a745; }
+        &.o_ranchi_kpi_warning { border-left-color: #f0ad4e; }
+        &.o_ranchi_kpi_danger { border-left-color: #dc3545; }
+    }
+
+    .o_ranchi_kpi_icon {
+        font-size: 1.25rem;
+        opacity: 0.6;
+        padding-top: 0.2rem;
+    }
+
+    .o_ranchi_kpi_label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--o-text-muted, #6c757d);
+    }
+
+    .o_ranchi_kpi_value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .o_ranchi_kpi_sub {
+        font-size: 0.8rem;
+        color: var(--o-text-muted, #6c757d);
+    }
+
+    .o_ranchi_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+
+    .o_ranchi_card {
+        padding: 1rem;
+        background: var(--o-view-background-color, #fff);
+        border: 1px solid var(--o-border-color, #dee2e6);
+        border-radius: 0.5rem;
+    }
+
+    .o_ranchi_card_wide {
+        grid-column: span 2;
+        @media (max-width: 700px) { grid-column: span 1; }
+    }
+
+    .o_ranchi_card_title {
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+    }
+
+    .o_ranchi_row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.4rem 0;
+        border-top: 1px solid var(--o-border-color, #f1f1f1);
+
+        &:first-of-type { border-top: 0; }
+    }
+
+    .o_ranchi_row_label { color: var(--o-text-muted, #6c757d); }
+    .o_ranchi_row_value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .o_ranchi_chart {
+        position: relative;
+        height: 260px;
+    }
+
+    .o_ranchi_link {
+        cursor: pointer;
+        &:hover { background: rgba(0, 0, 0, 0.03); }
+    }
+}

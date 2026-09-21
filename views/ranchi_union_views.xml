@@ -8,7 +8,9 @@
                 <field name="code"/>
                 <field name="name"/>
                 <field name="credit_officer_id"/>
-                <field name="union_day"/>
+                <field name="loan_type_id"/>
+                <field name="meeting_frequency" column_invisible="1"/>
+                <field name="union_day" invisible="meeting_frequency == 'daily'"/>
                 <field name="confirmed_member_count" string="Members"/>
                 <field name="active_loan_count" string="Active Loans"/>
                 <field name="loans_outstanding" sum="Total"/>
@@ -46,7 +48,14 @@
                         <group>
                             <field name="code"/>
                             <field name="credit_officer_id"/>
-                            <field name="union_day"/>
+                            <field name="loan_type_id" options="{'no_create': True}"
+                                   readonly="active_loan_count > 0"/>
+                            <field name="meeting_frequency" invisible="1"/>
+                            <field name="union_day" invisible="meeting_frequency == 'daily'"
+                                   required="meeting_frequency == 'weekly'"/>
+                            <div class="text-muted" colspan="2" invisible="meeting_frequency != 'daily'">
+                                This union meets every working day, so it has no union day.
+                            </div>
                             <field name="meeting_venue"/>
                         </group>
                         <group>
@@ -87,12 +96,17 @@
                 <field name="name"/>
                 <field name="code"/>
                 <field name="credit_officer_id"/>
+                <field name="loan_type_id"/>
                 <filter name="active_state" string="Active" domain="[('state', '=', 'active')]"/>
+                <separator/>
+                <filter name="weekly" string="Meets Weekly" domain="[('meeting_frequency', '=', 'weekly')]"/>
+                <filter name="daily" string="Meets Daily" domain="[('meeting_frequency', '=', 'daily')]"/>
                 <filter name="my_unions" string="My Unions" domain="[('credit_officer_user_id', '=', uid)]"/>
                 <separator/>
                 <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                    <filter name="group_loan_type" string="Loan Type" context="{'group_by': 'loan_type_id'}"/>
                     <filter name="group_day" string="Union Day" context="{'group_by': 'union_day'}"/>
                 </group>
             </search>
@@ -106,7 +120,7 @@
         <field name="context">{'search_default_active_state': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create the first union</p>
-            <p>A union is a group of members who meet on a fixed day with their credit officer.</p>
+            <p>A union is a group of members who run one loan type and meet their credit officer either on a fixed union day or every working day.</p>
         </field>
     </record>
 </odoo>

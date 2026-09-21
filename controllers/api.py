@@ -129,6 +129,9 @@ class RanchiApiV1(http.Controller):
         return {
             'id': u.id, 'code': u.code, 'name': u.name, 'status': u.state,
             'unionDay': u.union_day,
+            'meetingFrequency': u.meeting_frequency,
+            'loanTypeId': u.loan_type_id.id,
+            'loanTypeName': u.loan_type_id.name,
             'creditOfficerId': u.credit_officer_id.id or None,
             'creditOfficerName': u.credit_officer_id.name or None,
             'memberCount': u.member_count, 'confirmedMemberCount': u.confirmed_member_count,
@@ -157,6 +160,7 @@ class RanchiApiV1(http.Controller):
             'serviceRate': lt.service_rate, 'serviceCollection': lt.service_collection,
             'adminCharge': self._money(lt.admin_charge), 'riskPremiumRate': lt.risk_premium_rate,
             'installmentCount': lt.installment_count, 'installmentPeriod': lt.installment_period,
+            'meetingFrequency': lt.meeting_frequency,
             'graceDays': lt.grace_days,
             'minAmount': self._money(lt.min_amount), 'maxAmount': self._money(lt.max_amount),
             'stages': [{'id': s.id, 'name': s.name, 'maxPrincipal': self._money(s.max_principal),

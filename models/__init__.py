@@ -15,3 +15,4 @@ from . import withdrawal_request
 from . import collection
 from . import lapse_adjustment
 from . import api_request
+from . import dashboard

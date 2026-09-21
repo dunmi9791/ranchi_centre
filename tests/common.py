@@ -52,13 +52,13 @@ class RanchiCommon(AccountTestInvoicingCommon):
         })
         cls.env.user.write({'groups_id': [(4, cls.env.ref('ranchi_centre.group_ranchi_manager').id)]})
         cls.officer = cls.env['hr.employee'].create({'name': 'Officer One', 'company_id': company.id})
-        cls.union = cls.env['ranchi.union'].create({
-            'name': 'Test Union', 'company_id': company.id, 'union_day': '1',
-            'credit_officer_id': cls.officer.id})
         cls.loan_type = cls.env['ranchi.loan.type'].create({
             'name': 'Weekly 10%', 'service_rate': 10.0, 'service_collection': 'spread',
             'admin_charge': 500.0, 'risk_premium_rate': 1.0,
             'installment_count': 4, 'installment_period': 'weekly'})
+        cls.union = cls.env['ranchi.union'].create({
+            'name': 'Test Union', 'company_id': company.id, 'union_day': '1',
+            'loan_type_id': cls.loan_type.id, 'credit_officer_id': cls.officer.id})
         cls.member = cls._make_member('Member A')
 
     @classmethod

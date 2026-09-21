@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class RanchiLoanType(models.Model):
@@ -37,6 +37,11 @@ class RanchiLoanType(models.Model):
     installment_period = fields.Selection(
         [('daily', 'Daily'), ('weekly', 'Weekly'), ('biweekly', 'Every two weeks'), ('monthly', 'Monthly')],
         required=True, default='weekly')
+    meeting_frequency = fields.Selection(
+        [('weekly', 'Weekly, on the union day'), ('daily', 'Daily, no union day')],
+        string="Union Meetings", required=True, default='weekly',
+        help="How unions running this loan type meet. Daily unions (e.g. Rapid) have no union day: "
+             "the officer visits them every working day.")
     grace_days = fields.Integer(
         string="Grace Days", default=0,
         help="Days after the due date before an installment is treated as overdue.")
@@ -45,6 +50,8 @@ class RanchiLoanType(models.Model):
                                  help="0 means no ceiling at loan type level.")
     stage_ids = fields.One2many('ranchi.loan.stage', 'loan_type_id', string="Stages")
     loan_count = fields.Integer(compute='_compute_loan_count')
+    union_ids = fields.One2many('ranchi.union', 'loan_type_id', string="Unions")
+    union_count = fields.Integer(compute='_compute_union_count')
 
     @api.depends('company_id')
     def _compute_currency_id(self):
@@ -57,6 +64,31 @@ class RanchiLoanType(models.Model):
         counts = {lt.id: count for lt, count in groups}
         for rec in self:
             rec.loan_count = counts.get(rec.id, 0)
+
+    @api.depends('union_ids')
+    def _compute_union_count(self):
+        for rec in self:
+            rec.union_count = len(rec.union_ids)
+
+    def write(self, vals):
+        if 'meeting_frequency' in vals:
+            for rec in self:
+                if rec.meeting_frequency == vals['meeting_frequency']:
+                    continue
+                unions = rec.union_ids.filtered(lambda u: u.state != 'closed')
+                if unions:
+                    raise UserError(_(
+                        "Cannot change how %(type)s unions meet while %(count)s union(s) run it: "
+                        "%(unions)s. Their union days would no longer be valid.",
+                        type=rec.name, count=len(unions), unions=', '.join(unions.mapped('name'))))
+        return super().write(vals)
+
+    def action_view_unions(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('ranchi_centre.action_ranchi_union')
+        action['domain'] = [('loan_type_id', '=', self.id)]
+        action['context'] = {'default_loan_type_id': self.id, 'search_default_active_state': 1}
+        return action
 
     @api.constrains('installment_count', 'service_rate', 'risk_premium_rate', 'min_amount', 'max_amount')
     def _check_values(self):
