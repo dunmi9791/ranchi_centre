@@ -52,7 +52,7 @@ class TestLoanFlow(RanchiCommon):
             'line_ids': [(0, 0, {'member_id': self.member.id, 'loan_id': loan.id,
                                  'amount_loan': first_due.amount_total, 'amount_savings': 200.0})],
         })
-        collection.action_post()
+        self._hand_over(collection)
         self.assertEqual(collection.state, 'posted')
         self.assertEqual(first_due.state, 'paid')
         self.assertAlmostEqual(loan.balance, 11000.0 - first_due.amount_total)
@@ -63,7 +63,7 @@ class TestLoanFlow(RanchiCommon):
             'union_id': self.union.id, 'company_id': self.company.id, 'journal_id': self.bank_journal.id,
             'line_ids': [(0, 0, {'member_id': self.member.id, 'loan_id': loan.id, 'amount_loan': loan.balance})],
         })
-        rest.action_post()
+        self._hand_over(rest)
         self.assertEqual(loan.state, 'paid')
         self.assertAlmostEqual(loan.balance, 0.0)
         self.assertEqual(self.member.loan_cycle, 1)

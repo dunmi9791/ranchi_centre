@@ -4,7 +4,7 @@
         <field name="name">ranchi.collection.list</field>
         <field name="model">ranchi.collection</field>
         <field name="arch" type="xml">
-            <list decoration-muted="state == 'cancelled'">
+            <list decoration-muted="state == 'cancelled'" decoration-bf="state == 'submitted'">
                 <field name="name"/>
                 <field name="date"/>
                 <field name="union_id"/>
@@ -15,7 +15,7 @@
                 <field name="amount_savings_total" sum="Total"/>
                 <field name="amount_total" sum="Total"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
-                <field name="state" widget="badge" decoration-success="state == 'posted'" decoration-info="state == 'draft'"/>
+                <field name="state" widget="badge" decoration-success="state == 'posted'" decoration-info="state == 'draft'" decoration-warning="state == 'submitted'"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
@@ -29,11 +29,17 @@
                 <header>
                     <button name="action_fill_due_installments" type="object" string="Add Members With Dues"
                             invisible="state != 'draft' or not union_id"/>
-                    <button name="action_post" type="object" string="Post" class="btn-primary"
-                            invisible="state != 'draft'" confirm="Post this collection? Repayments and deposits will be booked."/>
+                    <button name="action_submit" type="object" string="Submit Cash" class="btn-primary"
+                            invisible="state != 'draft'"
+                            confirm="Hand this collection and its cash over to the manager? It can no longer be edited."/>
+                    <button name="action_confirm_cash" type="object" string="Confirm Cash &amp; Post" class="btn-primary"
+                            invisible="state != 'submitted'" groups="ranchi_centre.group_ranchi_manager"
+                            confirm="Confirm the cash was received and post this collection? Repayments and deposits will be booked."/>
+                    <button name="action_return_to_officer" type="object" string="Return to Officer"
+                            invisible="state != 'submitted'" groups="ranchi_centre.group_ranchi_manager"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'cancelled'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,posted"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -44,6 +50,9 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
                     <field name="move_id" invisible="1"/>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'draft' or not return_reason">
+                        Returned by the manager: <field name="return_reason" readonly="1" class="d-inline"/>
+                    </div>
                     <group>
                         <group>
                             <field name="union_id" readonly="state != 'draft'" options="{'no_create': True}"/>
@@ -78,6 +87,26 @@
                                 <field name="amount_total" class="oe_subtotal_footer_separator"/>
                             </group>
                         </page>
+                        <page string="Cash Handover" name="handover" invisible="state == 'draft' and not submitted_by_id">
+                            <group>
+                                <group string="Officer">
+                                    <field name="submitted_by_id"/>
+                                    <field name="submitted_date"/>
+                                    <field name="amount_total" string="Expected Cash"/>
+                                </group>
+                                <group string="Manager">
+                                    <field name="amount_received" readonly="state != 'submitted'"
+                                           groups="ranchi_centre.group_ranchi_manager"/>
+                                    <field name="amount_received" readonly="1" string="Cash Received"
+                                           groups="!ranchi_centre.group_ranchi_manager"/>
+                                    <field name="received_by_id"/>
+                                    <field name="received_date"/>
+                                    <field name="return_reason" invisible="state != 'submitted'"
+                                           groups="ranchi_centre.group_ranchi_manager"
+                                           placeholder="Reason, if returning to the officer"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Notes" name="notes">
                             <field name="note"/>
                         </page>
@@ -97,6 +126,7 @@
                 <field name="union_id"/>
                 <field name="credit_officer_id"/>
                 <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="submitted" string="Cash Submitted" domain="[('state', '=', 'submitted')]"/>
                 <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
                 <separator/>
                 <filter name="today" string="Today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
+
+MANAGER_GROUP = 'ranchi_centre.group_ranchi_manager'
+# Fields that make up what was collected; frozen once the officer hands the cash over.
+LOCKED_FIELDS = {'union_id', 'date', 'journal_id', 'company_id', 'credit_officer_id', 'line_ids'}
 
 
 class RanchiCollection(models.Model):
@@ -26,7 +30,7 @@ class RanchiCollection(models.Model):
         domain="[('type', 'in', ('bank', 'cash'))]",
         default=lambda self: self.env.company.ranchi_collection_journal_id)
     state = fields.Selection(
-        [('draft', 'Draft'), ('posted', 'Posted'), ('cancelled', 'Cancelled')],
+        [('draft', 'Draft'), ('submitted', 'Cash Submitted'), ('posted', 'Posted'), ('cancelled', 'Cancelled')],
         default='draft', required=True, tracking=True, copy=False, index=True)
     line_ids = fields.One2many('ranchi.collection.line', 'collection_id', string="Lines", copy=True)
     line_count = fields.Integer(compute='_compute_totals')
@@ -35,6 +39,15 @@ class RanchiCollection(models.Model):
     amount_total = fields.Monetary(compute='_compute_totals', store=True, string="Total Collected")
     move_id = fields.Many2one('account.move', string="Journal Entry", readonly=True, copy=False)
     note = fields.Text()
+    # cash handover: the officer submits, a manager counts the cash and confirms before posting
+    submitted_by_id = fields.Many2one('res.users', string="Submitted By", readonly=True, copy=False)
+    submitted_date = fields.Datetime(string="Submitted On", readonly=True, copy=False)
+    amount_received = fields.Monetary(
+        string="Cash Received", copy=False, tracking=True,
+        help="Cash counted by the manager at handover. It must match the total collected before posting.")
+    received_by_id = fields.Many2one('res.users', string="Received By", readonly=True, copy=False, tracking=True)
+    received_date = fields.Datetime(string="Received On", readonly=True, copy=False)
+    return_reason = fields.Char(string="Returned Because", copy=False, tracking=True)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -43,10 +56,18 @@ class RanchiCollection(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('ranchi.collection') or '/'
         return super().create(vals_list)
 
+    def write(self, vals):
+        if not self.env.su and not self.env.user.has_group(MANAGER_GROUP):
+            if vals.get('state') == 'posted' or 'amount_received' in vals:
+                raise AccessError(_("Only a manager can confirm the cash and post a collection."))
+            if LOCKED_FIELDS & set(vals) and any(col.state != 'draft' for col in self):
+                raise UserError(_("This collection has been handed over; ask a manager to return it before editing."))
+        return super().write(vals)
+
     @api.ondelete(at_uninstall=False)
     def _unlink_only_draft(self):
-        if any(col.state == 'posted' for col in self):
-            raise UserError(_("Posted collections cannot be deleted."))
+        if any(col.state in ('submitted', 'posted') for col in self):
+            raise UserError(_("Submitted or posted collections cannot be deleted."))
 
     @api.depends('union_id')
     def _compute_credit_officer(self):
@@ -85,16 +106,69 @@ class RanchiCollection(models.Model):
             self.write({'line_ids': lines})
         return True
 
-    def action_post(self):
+    def _check_manager(self):
+        if not self.env.su and not self.env.user.has_group(MANAGER_GROUP):
+            raise AccessError(_("Only a manager can confirm the cash and post a collection."))
+
+    def action_submit(self):
+        """Credit officer hands the collection and its cash over to the manager."""
         for col in self:
             if col.state != 'draft':
-                raise UserError(_("Only draft collections can be posted."))
+                raise UserError(_("Only draft collections can be submitted."))
+            if not col.line_ids:
+                raise UserError(_("Add at least one line before submitting."))
+            for line in col.line_ids:
+                line._validate()
+        self.write({
+            'state': 'submitted',
+            'submitted_by_id': self.env.uid,
+            'submitted_date': fields.Datetime.now(),
+            'return_reason': False,
+        })
+        for col in self:
+            col.message_post(body=_("Submitted for cash handover: %s expected.",
+                                    col.currency_id.format(col.amount_total)))
+        return True
+
+    def action_return_to_officer(self):
+        """Manager sends the collection back, e.g. when the cash does not match the sheet."""
+        self._check_manager()
+        for col in self:
+            if col.state != 'submitted':
+                raise UserError(_("Only submitted collections can be returned."))
+        self.sudo().write({'state': 'draft', 'amount_received': 0.0})
+        for col in self:
+            col.message_post(body=_("Returned to the credit officer: %s", col.return_reason or _("no reason given")))
+        return True
+
+    def action_confirm_cash(self):
+        """Manager confirms the cash counted matches the collection, then posts it."""
+        self._check_manager()
+        for col in self:
+            if col.state != 'submitted':
+                raise UserError(_("The credit officer must submit the collection before the cash is confirmed."))
+            if col.currency_id.compare_amounts(col.amount_received, col.amount_total) != 0:
+                raise UserError(_(
+                    "Cash received (%(received)s) does not match the total collected (%(total)s) on %(ref)s. "
+                    "Correct the count or return the collection to the officer.",
+                    received=col.currency_id.format(col.amount_received),
+                    total=col.currency_id.format(col.amount_total), ref=col.name))
+        self.write({'received_by_id': self.env.uid, 'received_date': fields.Datetime.now()})
+        return self.action_post()
+
+    def action_post(self):
+        self._check_manager()
+        for col in self:
+            if col.state != 'submitted':
+                raise UserError(_("Only collections whose cash has been submitted can be posted."))
             if not col.line_ids:
                 raise UserError(_("Add at least one line before posting."))
-            # Access to the collection itself was checked under the user's own rights and record
-            # rules; the journal entry needs accounting rights that credit officers do not have,
-            # so the posting runs as superuser.
+            if not col.received_by_id:
+                raise UserError(_("Confirm the cash received before posting %s.", col.name))
+            # The journal entry needs accounting rights the posting user may not have, so the
+            # posting runs as superuser once the manager check above has passed.
             col.sudo()._post()
+        return True
 
     def _post(self):
         self.ensure_one()
@@ -168,6 +242,8 @@ class RanchiCollection(models.Model):
 
     def action_cancel(self):
         for col in self:
+            if col.state == 'submitted':
+                raise UserError(_("Ask a manager to return %s to draft before cancelling it.", col.name))
             if col.state == 'posted':
                 raise UserError(_(
                     "Posted collections cannot be cancelled here; reverse the journal entry from Accounting "
@@ -215,6 +291,26 @@ class RanchiCollectionLine(models.Model):
     repayment_ids = fields.One2many('ranchi.loan.repayment', 'collection_line_id')
     savings_transaction_id = fields.Many2one('ranchi.savings.transaction', readonly=True)
     note = fields.Char()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        lines._check_collection_editable()
+        return lines
+
+    def write(self, vals):
+        self._check_collection_editable()
+        return super().write(vals)
+
+    def unlink(self):
+        self._check_collection_editable()
+        return super().unlink()
+
+    def _check_collection_editable(self):
+        if self.env.su:
+            return
+        if any(line.collection_id.state != 'draft' for line in self):
+            raise UserError(_("Lines can only be changed while the collection is a draft."))
 
     @api.depends('amount_loan', 'amount_savings')
     def _compute_amount_total(self):

@@ -216,6 +216,10 @@ class RanchiApiV1(http.Controller):
             'status': c.state, 'journalId': c.journal_id.id,
             'loanTotal': self._money(c.amount_loan_total), 'savingsTotal': self._money(c.amount_savings_total),
             'total': self._money(c.amount_total),
+            'submittedAt': c.submitted_date and c.submitted_date.isoformat() or None,
+            'cashReceived': self._money(c.amount_received) if c.received_by_id else None,
+            'receivedBy': c.received_by_id.name or None,
+            'returnReason': c.return_reason or None,
             'lines': [{'id': ln.id, 'memberId': ln.member_id.id, 'loanId': ln.loan_id.id or None,
                        'loanAmount': self._money(ln.amount_loan), 'savingsAmount': self._money(ln.amount_savings)}
                       for ln in c.line_ids],
@@ -535,9 +539,11 @@ class RanchiApiV1(http.Controller):
 
     @api_route('/api/v1/collections/create')
     def collection_create(self, **kw):
-        """Create and post a collection.
+        """Create a collection and submit it for cash handover.
 
-        Body: {unionId, journalId?, date?, lines: [{memberId, loanId?, loanAmount?, savingsAmount?}], idempotencyKey?}
+        A manager confirms the cash received and posts it from the backend.
+        Body: {unionId, journalId?, date?, lines: [{memberId, loanId?, loanAmount?, savingsAmount?}],
+               submit? (default true; false keeps a draft), idempotencyKey?}
         """
         self._authenticate()
         data = self._params(kw)
@@ -568,15 +574,16 @@ class RanchiApiV1(http.Controller):
                 'note': data.get('note'),
                 'line_ids': lines,
             })
-            if data.get('post', True):
-                collection.action_post()
+            # 'post' is the field's old name; officers can no longer post, only hand over.
+            if data.get('submit', data.get('post', True)):
+                collection.action_submit()
             return self._ser_collection(collection)
 
         return self._run(lambda: self._idempotent(data, 'collections/create', create))
 
     @api_route('/api/v1/installments/pay')
     def installment_pay(self, **kw):
-        """Backwards-compatible single-installment payment: creates a one-line posted collection."""
+        """Backwards-compatible single-installment payment: creates a one-line collection submitted for cash handover."""
         self._authenticate()
         data = self._params(kw)
         self._require(data, 'installmentId')
@@ -601,7 +608,7 @@ class RanchiApiV1(http.Controller):
                     'amount_savings': float(data.get('savingsAmount') or 0.0),
                 })],
             })
-            collection.action_post()
+            collection.action_submit()
             return {'collection': self._ser_collection(collection),
                     'installment': self._ser_installment(inst), 'loan': self._ser_loan(loan)}
 
@@ -617,6 +624,8 @@ class RanchiApiV1(http.Controller):
             domain.append(('union_id', '=', int(data['unionId'])))
         if data.get('date'):
             domain.append(('date', '=', data['date']))
+        if data.get('status'):
+            domain.append(('state', '=', data['status']))
         cols = request.env['ranchi.collection'].search(domain, limit=limit, offset=offset)
         return [self._ser_collection(c) for c in cols]
 
@@ -705,7 +714,8 @@ class RanchiApiV1(http.Controller):
         loan_domain = [('union_id', '=', int(data['unionId']))] if data.get('unionId') else []
         inst_domain = list(loan_domain)
         disbursed = Loan.search(loan_domain + [('state', '=', 'disbursed')])
-        collections_today = Col.search(loan_domain + [('date', '=', today), ('state', '=', 'posted')])
+        collections_today = Col.search(loan_domain + [('date', '=', today), ('state', 'in', ('submitted', 'posted'))])
+        awaiting = Col.search(loan_domain + [('state', '=', 'submitted')])
         return {
             'date': today.isoformat(),
             'activeLoans': len(disbursed),
@@ -718,6 +728,8 @@ class RanchiApiV1(http.Controller):
             'collectedToday': self._money(sum(collections_today.mapped('amount_total'))),
             'loanRepaidToday': self._money(sum(collections_today.mapped('amount_loan_total'))),
             'savingsCollectedToday': self._money(sum(collections_today.mapped('amount_savings_total'))),
+            'awaitingHandover': len(awaiting),
+            'awaitingHandoverAmount': self._money(sum(awaiting.mapped('amount_total'))),
             'pendingWithdrawals': request.env['ranchi.withdrawal.request'].search_count(
                 loan_domain + [('state', 'in', ('submitted', 'approved_l1', 'approved'))]),
         }

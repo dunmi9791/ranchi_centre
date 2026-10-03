@@ -126,6 +126,12 @@
                             <t t-set="badge" t-value="d.savings.pending_withdrawals > 0"/>
                         </t>
                         <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Cash awaiting handover'"/>
+                            <t t-set="value" t-value="int(d.collections.submitted) + ' · ' + money(d.collections.submitted_amount, true)"/>
+                            <t t-set="key" t-value="'collections_submitted'"/>
+                            <t t-set="badge" t-value="d.collections.submitted > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
                             <t t-set="label" t-value="'Draft collections'"/>
                             <t t-set="value" t-value="int(d.collections.draft)"/>
                             <t t-set="key" t-value="'collections_draft'"/>

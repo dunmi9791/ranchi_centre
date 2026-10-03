@@ -32,6 +32,7 @@ class RanchiDashboard(models.AbstractModel):
                                 [('state', 'in', ('submitted', 'approved_l1', 'approved'))], {}),
         'collections_today': ('ranchi_centre.action_ranchi_collection', 'today', {}),
         'collections_draft': ('ranchi_centre.action_ranchi_collection', [('state', '=', 'draft')], {}),
+        'collections_submitted': ('ranchi_centre.action_ranchi_collection', [('state', '=', 'submitted')], {}),
         'disbursements_pending': ('ranchi_centre.action_ranchi_disbursement',
                                   [('state', 'in', ('pending', 'processing'))], {}),
         'disbursements_failed': ('ranchi_centre.action_ranchi_disbursement', [('state', '=', 'failed')], {}),
@@ -122,6 +123,7 @@ class RanchiDashboard(models.AbstractModel):
         pending_disbursements = Disbursement.search([('state', 'in', ('pending', 'processing'))])
 
         collections_today = Collection.search([('date', '=', today), ('state', '!=', 'cancelled')])
+        collections_submitted = Collection.search([('state', '=', 'submitted')])
         collections_month = self._sum(
             'ranchi.collection', [('state', '=', 'posted'), ('date', '>=', month_start), ('date', '<=', today)],
             'amount_total')
@@ -182,6 +184,8 @@ class RanchiDashboard(models.AbstractModel):
                 'today': len(collections_today),
                 'today_amount': sum(collections_today.mapped('amount_total')),
                 'draft': Collection.search_count([('state', '=', 'draft')]),
+                'submitted': len(collections_submitted),
+                'submitted_amount': sum(collections_submitted.mapped('amount_total')),
                 'this_month': collections_month,
             },
             'disbursements': {

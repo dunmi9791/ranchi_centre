@@ -16,7 +16,7 @@
         <field name="name">Accountant</field>
         <field name="category_id" ref="module_category_ranchi"/>
         <field name="implied_ids" eval="[(4, ref('group_ranchi_officer'))]"/>
-        <field name="comment">All branch records, posts collections, savings and disbursements.</field>
+        <field name="comment">All branch records, posts savings and disbursements. Collections are posted by a manager after the cash handover.</field>
     </record>
     <record id="group_ranchi_manager" model="res.groups">
         <field name="name">Branch Manager</field>

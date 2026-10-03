@@ -78,7 +78,7 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         self.assertIn(self.bank_journal.id, [j['id'] for j in journals])
         self.assertEqual([j['id'] for j in journals if j['isDefault']], [self.bank_journal.id])
 
-    def test_officer_posts_collection_and_replay_is_idempotent(self):
+    def test_officer_submits_collection_and_replay_is_idempotent(self):
         loan = self._disbursed_loan()
         key = self._key()
         params = {
@@ -88,12 +88,21 @@ class TestOfficerApi(RanchiCommon, HttpCase):
                        'loanAmount': loan.installment_amount, 'savingsAmount': 500.0}],
         }
         result = self._ok('/api/v1/collections/create', params, key)
-        self.assertEqual(result['status'], 'posted')
+        self.assertEqual(result['status'], 'submitted')
         self.assertEqual(result['loanTotal'], round(loan.installment_amount, 2))
         self.assertEqual(result['savingsTotal'], 500.0)
         collection = self.env['ranchi.collection'].browse(result['id'])
         self.assertEqual(collection.create_uid, self.officer_user)
-        self.assertTrue(collection.move_id.state == 'posted')
+        self.assertEqual(collection.submitted_by_id, self.officer_user)
+        self.assertFalse(collection.move_id)
+        self.assertEqual(loan.amount_paid, 0.0)
+        summary = self._ok('/api/v1/summary', {}, key)
+        self.assertEqual(summary['awaitingHandover'], 1)
+
+        # nothing is booked until the manager confirms the cash
+        collection.amount_received = collection.amount_total
+        collection.action_confirm_cash()
+        self.assertEqual(collection.move_id.state, 'posted')
         self.assertEqual(loan.amount_paid, loan.installment_amount)
         self.assertEqual(self.member.savings_balance, 500.0)
 
@@ -106,9 +115,15 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         inst = loan.installment_ids.sorted('sequence')[0]
         key = self._key()
         result = self._ok('/api/v1/installments/pay', {'installmentId': inst.id, 'idempotencyKey': 'web-pay-1'}, key)
-        self.assertEqual(result['collection']['status'], 'posted')
-        self.assertEqual(result['installment']['amountResidual'], 0.0)
+        self.assertEqual(result['collection']['status'], 'submitted')
+        self.assertGreater(inst.amount_residual, 0.0)
+        self._hand_over_posted(result['collection']['id'])
         self.assertEqual(inst.amount_residual, 0.0)
+
+    def _hand_over_posted(self, collection_id):
+        collection = self.env['ranchi.collection'].browse(collection_id)
+        collection.amount_received = collection.amount_total
+        collection.action_confirm_cash()
 
     def test_officer_records_savings_deposit(self):
         key = self._key()

@@ -78,6 +78,13 @@ class RanchiCommon(AccountTestInvoicingCommon):
         tx.action_post()
         return tx
 
+    def _hand_over(self, collection):
+        """Officer submits, manager counts the full cash and posts."""
+        collection.action_submit()
+        collection.amount_received = collection.amount_total
+        collection.action_confirm_cash()
+        return collection
+
     def _disbursed_loan(self, member=None, amount=10000.0):
         member = member or self.member
         loan = self.env['ranchi.loan'].create({
