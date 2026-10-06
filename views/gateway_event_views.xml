@@ -22,7 +22,7 @@
         <field name="arch" type="xml">
             <form create="false">
                 <header>
-                    <button name="action_reprocess" type="object" string="Reprocess" invisible="state != 'error'" groups="ranchi_centre.group_ranchi_manager"/>
+                    <button name="action_reprocess" type="object" string="Reprocess" invisible="state != 'error'" groups="ranchi_centre.group_ranchi_general_manager"/>
                 </header>
                 <sheet>
                     <group>

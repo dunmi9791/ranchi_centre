@@ -3,6 +3,7 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 MANAGER_GROUP = 'ranchi_centre.group_ranchi_manager'
+GENERAL_MANAGER_GROUP = 'ranchi_centre.group_ranchi_general_manager'
 # Fields that make up what was collected; frozen once the officer hands the cash over.
 LOCKED_FIELDS = {'union_id', 'date', 'journal_id', 'company_id', 'credit_officer_id', 'line_ids'}
 
@@ -22,6 +23,9 @@ class RanchiCollection(models.Model):
     union_id = fields.Many2one(
         'ranchi.union', string="Union", required=True, tracking=True, check_company=True,
         domain="[('state', '=', 'active')]")
+    loan_type_id = fields.Many2one(
+        related='union_id.loan_type_id', string="Loan Type", store=True, index=True,
+        help="Product the union runs (e.g. Ranchi weekly or Rapid daily); decides which manager takes the cash.")
     credit_officer_id = fields.Many2one(
         'hr.employee', string="Collected By", tracking=True, check_company=True,
         compute='_compute_credit_officer', store=True, readonly=False)
@@ -107,8 +111,19 @@ class RanchiCollection(models.Model):
         return True
 
     def _check_manager(self):
-        if not self.env.su and not self.env.user.has_group(MANAGER_GROUP):
+        if self.env.su:
+            return
+        user = self.env.user
+        if not user.has_group(MANAGER_GROUP):
             raise AccessError(_("Only a manager can confirm the cash and post a collection."))
+        if user.has_group(GENERAL_MANAGER_GROUP):
+            return
+        # each product (Ranchi weekly, Rapid daily) has its own field managers
+        for col in self:
+            if user not in col.sudo().loan_type_id.manager_ids:
+                raise AccessError(_(
+                    "%(col)s belongs to %(type)s; only that product's managers can handle its cash.",
+                    col=col.name, type=col.sudo().loan_type_id.name))
 
     def action_submit(self):
         """Credit officer hands the collection and its cash over to the manager."""

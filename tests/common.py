@@ -50,7 +50,7 @@ class RanchiCommon(AccountTestInvoicingCommon):
             'ranchi_service_charge_product_id': cls.env.ref('ranchi_centre.product_service_charge').id,
             'ranchi_disbursement_provider': 'manual',
         })
-        cls.env.user.write({'groups_id': [(4, cls.env.ref('ranchi_centre.group_ranchi_manager').id)]})
+        cls.env.user.write({'groups_id': [(4, cls.env.ref('ranchi_centre.group_ranchi_general_manager').id)]})
         cls.officer = cls.env['hr.employee'].create({'name': 'Officer One', 'company_id': company.id})
         cls.loan_type = cls.env['ranchi.loan.type'].create({
             'name': 'Weekly 10%', 'service_rate': 10.0, 'service_collection': 'spread',

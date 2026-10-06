@@ -18,7 +18,7 @@
     <menuitem id="menu_ranchi_collections_root" name="Collections" parent="menu_ranchi_root" sequence="30"/>
     <menuitem id="menu_ranchi_collections" name="Field Collections" parent="menu_ranchi_collections_root" action="action_ranchi_collection" sequence="10"/>
     <menuitem id="menu_ranchi_lapse" name="Lapse Adjustments" parent="menu_ranchi_collections_root" action="action_ranchi_lapse_adjustment" sequence="20"
-              groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_auditor"/>
+              groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager,ranchi_centre.group_ranchi_auditor"/>
 
     <menuitem id="menu_ranchi_savings_root" name="Savings" parent="menu_ranchi_root" sequence="40"/>
     <menuitem id="menu_ranchi_savings_transactions" name="Transactions" parent="menu_ranchi_savings_root" action="action_ranchi_savings_transaction" sequence="10"/>
@@ -31,7 +31,7 @@
     <menuitem id="menu_ranchi_reporting_root" name="Reporting" parent="menu_ranchi_root" sequence="50"/>
     <menuitem id="menu_ranchi_statement" name="Savings Statement" parent="menu_ranchi_reporting_root" action="action_ranchi_savings_statement_wizard" sequence="10"/>
 
-    <menuitem id="menu_ranchi_config_root" name="Configuration" parent="menu_ranchi_root" sequence="90" groups="ranchi_centre.group_ranchi_manager"/>
+    <menuitem id="menu_ranchi_config_root" name="Configuration" parent="menu_ranchi_root" sequence="90" groups="ranchi_centre.group_ranchi_general_manager"/>
     <menuitem id="menu_ranchi_settings" name="Settings" parent="menu_ranchi_config_root" action="action_ranchi_config_settings" sequence="10"/>
     <menuitem id="menu_ranchi_loan_types" name="Loan Types" parent="menu_ranchi_config_root" action="action_ranchi_loan_type" sequence="20"/>
     <menuitem id="menu_ranchi_loan_stages" name="Loan Stages" parent="menu_ranchi_config_root" action="action_ranchi_loan_stage" sequence="30"/>

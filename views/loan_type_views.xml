@@ -15,6 +15,7 @@
                 <field name="installment_count"/>
                 <field name="installment_period"/>
                 <field name="meeting_frequency"/>
+                <field name="manager_ids" widget="many2many_tags" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="union_count"/>
                 <field name="loan_count"/>
@@ -57,6 +58,10 @@
                             <field name="max_amount"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
+                    </group>
+                    <group string="Field Collections" name="field_managers">
+                        <field name="manager_ids" widget="many2many_tags" options="{'no_create': True}"
+                               placeholder="Managers who confirm cash and post this product's collections"/>
                     </group>
                     <notebook>
                         <page string="Stages" name="stages">

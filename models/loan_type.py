@@ -42,6 +42,11 @@ class RanchiLoanType(models.Model):
         string="Union Meetings", required=True, default='weekly',
         help="How unions running this loan type meet. Daily unions (e.g. Rapid) have no union day: "
              "the officer visits them every working day.")
+    manager_ids = fields.Many2many(
+        'res.users', 'ranchi_loan_type_manager_rel', 'loan_type_id', 'user_id', string="Field Managers",
+        domain=lambda self: [('groups_id', 'in', self.env.ref('ranchi_centre.group_ranchi_manager').id)],
+        help="Loan product managers in charge of this product's field collections. They only see "
+             "unions, members, loans and collections of the loan types that list them here.")
     grace_days = fields.Integer(
         string="Grace Days", default=0,
         help="Days after the due date before an installment is treated as overdue.")

@@ -30,7 +30,7 @@
                 <header>
                     <button name="action_post" type="object" string="Post" class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state != 'posted' or origin not in ('manual', 'api', 'interest')"
-                            groups="ranchi_centre.group_ranchi_accountant" confirm="Reverse this transaction?"/>
+                            groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager" confirm="Reverse this transaction?"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'cancelled'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
                 </header>

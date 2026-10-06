@@ -237,6 +237,9 @@ class RanchiApiV1(http.Controller):
             'branchId': user.company_id.id, 'branchName': user.company_id.name,
             'currency': user.company_id.currency_id.name,
             'isManager': user.has_group('ranchi_centre.group_ranchi_manager'),
+            'isGeneralManager': user.has_group('ranchi_centre.group_ranchi_general_manager'),
+            'managedLoanTypeIds': request.env['ranchi.loan.type'].search(
+                [('manager_ids', 'in', user.id)]).ids,
             'withdrawalFeePercent': user.company_id.ranchi_withdrawal_fee_percent or 0.0,
             'unions': [self._ser_union(u) for u in unions],
         }

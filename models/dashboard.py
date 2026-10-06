@@ -9,8 +9,9 @@ class RanchiDashboard(models.AbstractModel):
     """Figures for the Ranchi Centre dashboard.
 
     Everything is read as the current user, so record rules apply: a credit officer only
-    sees their own unions, while accountants, managers and auditors see the whole branch
-    (or every branch selected in the company switcher).
+    sees their own unions, a loan product manager only the loan types they manage (Ranchi
+    weekly or Rapid daily), while accountants, general managers and auditors see the whole
+    branch (or every branch selected in the company switcher).
     """
     _name = 'ranchi.dashboard'
     _description = 'Ranchi Centre Dashboard'

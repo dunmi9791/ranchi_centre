@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="Ranchi Centre" string="Ranchi Centre" name="ranchi_centre" groups="ranchi_centre.group_ranchi_manager">
+                <app data-string="Ranchi Centre" string="Ranchi Centre" name="ranchi_centre" groups="ranchi_centre.group_ranchi_general_manager">
                     <block title="Branch" name="ranchi_branch">
                         <setting string="Branch Code" help="Prefix of member numbers, e.g. ABJ/M000001.">
                             <field name="ranchi_branch_code"/>

@@ -8,6 +8,7 @@
                 <field name="name"/>
                 <field name="date"/>
                 <field name="union_id"/>
+                <field name="loan_type_id" optional="show"/>
                 <field name="credit_officer_id"/>
                 <field name="journal_id"/>
                 <field name="line_count" string="Members"/>
@@ -56,6 +57,7 @@
                     <group>
                         <group>
                             <field name="union_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="loan_type_id"/>
                             <field name="credit_officer_id" readonly="state != 'draft'"/>
                             <field name="date" readonly="state != 'draft'"/>
                         </group>
@@ -124,7 +126,13 @@
             <search>
                 <field name="name"/>
                 <field name="union_id"/>
+                <field name="loan_type_id"/>
                 <field name="credit_officer_id"/>
+                <filter name="my_products" string="My Loan Products" domain="[('loan_type_id.manager_ids', 'in', uid)]"/>
+                <separator/>
+                <filter name="weekly" string="Weekly (Ranchi)" domain="[('loan_type_id.meeting_frequency', '=', 'weekly')]"/>
+                <filter name="daily" string="Daily (Rapid)" domain="[('loan_type_id.meeting_frequency', '=', 'daily')]"/>
+                <separator/>
                 <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="submitted" string="Cash Submitted" domain="[('state', '=', 'submitted')]"/>
                 <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
@@ -132,6 +140,7 @@
                 <filter name="today" string="Today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter name="date" string="Date" date="date"/>
                 <group expand="0" string="Group By">
+                    <filter name="group_loan_type" string="Loan Type" context="{'group_by': 'loan_type_id'}"/>
                     <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
                     <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
                     <filter name="group_date" string="Date" context="{'group_by': 'date:day'}"/>

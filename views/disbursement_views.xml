@@ -31,16 +31,16 @@
             <form create="false">
                 <header>
                     <button name="action_send" type="object" string="Send Transfer" class="btn-primary"
-                            invisible="state not in ('pending', 'failed')" groups="ranchi_centre.group_ranchi_accountant"/>
+                            invisible="state not in ('pending', 'failed')" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_mark_done" type="object" string="Mark Paid Out" class="btn-primary"
-                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant"
+                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"
                             confirm="Confirm that the money has left the bank? This posts the disbursement entry."/>
                     <button name="action_mark_failed" type="object" string="Mark Failed"
-                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant"/>
+                            invisible="state not in ('pending', 'processing')" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_retry" type="object" string="Retry" invisible="state != 'failed'"
-                            groups="ranchi_centre.group_ranchi_accountant"/>
+                            groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('pending', 'failed')"
-                            groups="ranchi_centre.group_ranchi_accountant"/>
+                            groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <field name="state" widget="statusbar" statusbar_visible="pending,processing,done"/>
                 </header>
                 <sheet>

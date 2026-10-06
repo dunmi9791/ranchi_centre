@@ -30,11 +30,11 @@
                 <header>
                     <button name="action_submit" type="object" string="Submit" class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_approve" type="object" string="Approve" class="btn-primary"
-                            invisible="state not in ('submitted', 'approved_l1')" groups="ranchi_centre.group_ranchi_accountant"/>
+                            invisible="state not in ('submitted', 'approved_l1')" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_open_pay_wizard" type="object" string="Pay" class="btn-primary"
-                            invisible="state != 'approved'" groups="ranchi_centre.group_ranchi_accountant"/>
+                            invisible="state != 'approved'" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_reject" type="object" string="Reject"
-                            invisible="state not in ('submitted', 'approved_l1', 'approved')" groups="ranchi_centre.group_ranchi_accountant"/>
+                            invisible="state not in ('submitted', 'approved_l1', 'approved')" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_cancel" type="object" string="Cancel"
                             invisible="state not in ('draft', 'submitted', 'approved_l1', 'approved')"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft"

@@ -19,11 +19,17 @@
         <field name="comment">All branch records, posts savings and disbursements. Collections are posted by a manager after the cash handover.</field>
     </record>
     <record id="group_ranchi_manager" model="res.groups">
-        <field name="name">Branch Manager</field>
+        <field name="name">Loan Product Manager</field>
         <field name="category_id" ref="module_category_ranchi"/>
-        <field name="implied_ids" eval="[(4, ref('group_ranchi_accountant'))]"/>
+        <field name="implied_ids" eval="[(3, ref('group_ranchi_accountant')), (4, ref('group_ranchi_officer'))]"/>
+        <field name="comment">Manages the field collections of the loan types that list them as manager (e.g. Ranchi weekly or Rapid daily): sees only those unions, approves, confirms cash and posts.</field>
+    </record>
+    <record id="group_ranchi_general_manager" model="res.groups">
+        <field name="name">General Manager</field>
+        <field name="category_id" ref="module_category_ranchi"/>
+        <field name="implied_ids" eval="[(4, ref('group_ranchi_manager')), (4, ref('group_ranchi_accountant'))]"/>
         <field name="users" eval="[(4, ref('base.user_admin'))]"/>
-        <field name="comment">Full access including configuration, approvals and deletion of drafts.</field>
+        <field name="comment">Full access to every loan product, including configuration.</field>
     </record>
     <record id="group_ranchi_auditor" model="res.groups">
         <field name="name">Auditor</field>
@@ -219,6 +225,83 @@
     <record id="rule_lapse_branch" model="ir.rule">
         <field name="name">Lapse adjustment: branch staff see all</field>
         <field name="model_id" ref="model_ranchi_lapse_adjustment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- ===================== Loan product manager: only the loan types they manage ===================== -->
+    <record id="rule_union_product_manager" model="ir.rule">
+        <field name="name">Union: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_union"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_loan_product_manager" model="ir.rule">
+        <field name="name">Loan: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_loan"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_installment_product_manager" model="ir.rule">
+        <field name="name">Installment: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_loan_installment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_repayment_product_manager" model="ir.rule">
+        <field name="name">Repayment: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_loan_repayment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_collection_product_manager" model="ir.rule">
+        <field name="name">Collection: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_collection"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_collection_line_product_manager" model="ir.rule">
+        <field name="name">Collection line: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_collection_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('collection_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_savings_tx_product_manager" model="ir.rule">
+        <field name="name">Savings transaction: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_savings_transaction"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('union_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_withdrawal_product_manager" model="ir.rule">
+        <field name="name">Withdrawal request: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_withdrawal_request"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('union_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_disbursement_product_manager" model="ir.rule">
+        <field name="name">Disbursement: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_disbursement"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_lapse_product_manager" model="ir.rule">
+        <field name="name">Lapse adjustment: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_lapse_adjustment"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <!-- Members of the other product are hidden from a product manager; non-members and members
+         without a union stay visible. Branch staff get an explicit open rule so the General Manager
+         (who is also a product manager) is not restricted. -->
+    <record id="rule_partner_product_manager" model="ir.rule">
+        <field name="name">Partner: product manager sees members of own loan types</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">['|', '|', ('is_ranchi_member', '=', False), ('union_id', '=', False), ('union_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+    <record id="rule_partner_branch" model="ir.rule">
+        <field name="name">Partner: branch staff see all members</field>
+        <field name="model_id" ref="base.model_res_partner"/>
         <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
         <field name="domain_force">[(1, '=', 1)]</field>
     </record>

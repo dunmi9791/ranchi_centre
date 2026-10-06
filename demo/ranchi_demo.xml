@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
+        <!-- one field manager per product: Ranchi (weekly unions) and Rapid (daily unions) -->
+        <record id="demo_user_ranchi_manager" model="res.users">
+            <field name="name">Ranchi Field Manager</field>
+            <field name="login">ranchi.manager</field>
+            <field name="password">ranchi.manager</field>
+            <field name="groups_id" eval="[(6, 0, [ref('ranchi_centre.group_ranchi_manager')])]"/>
+        </record>
+        <record id="demo_user_rapid_manager" model="res.users">
+            <field name="name">Rapid Field Manager</field>
+            <field name="login">rapid.manager</field>
+            <field name="password">rapid.manager</field>
+            <field name="groups_id" eval="[(6, 0, [ref('ranchi_centre.group_ranchi_manager')])]"/>
+        </record>
         <record id="demo_loan_type_weekly" model="ranchi.loan.type">
             <field name="name">Market Trader Weekly</field>
             <field name="code">MTW</field>
@@ -13,6 +26,7 @@
             <field name="grace_days">2</field>
             <field name="min_amount">20000.0</field>
             <field name="max_amount">500000.0</field>
+            <field name="manager_ids" eval="[(4, ref('demo_user_ranchi_manager'))]"/>
         </record>
         <record id="demo_loan_stage_1" model="ranchi.loan.stage">
             <field name="name">First cycle</field>
@@ -45,6 +59,7 @@
             <field name="installment_count">6</field>
             <field name="installment_period">monthly</field>
             <field name="grace_days">5</field>
+            <field name="manager_ids" eval="[(4, ref('demo_user_ranchi_manager'))]"/>
         </record>
         <record id="demo_loan_type_rapid" model="ranchi.loan.type">
             <field name="name">Rapid Daily</field>
@@ -59,6 +74,7 @@
             <field name="grace_days">0</field>
             <field name="min_amount">10000.0</field>
             <field name="max_amount">100000.0</field>
+            <field name="manager_ids" eval="[(4, ref('demo_user_rapid_manager'))]"/>
         </record>
 
         <record id="demo_savings_rate" model="ranchi.savings.rate">

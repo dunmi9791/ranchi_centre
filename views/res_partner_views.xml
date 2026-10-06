@@ -11,10 +11,10 @@
                             class="btn-primary" invisible="membership_state != 'applied' or membership_fee_move_id"/>
                     <button name="action_vet_member" type="object" string="Vet"
                             class="btn-secondary" invisible="membership_state != 'applied'"
-                            groups="ranchi_centre.group_ranchi_accountant"/>
+                            groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_confirm_member" type="object" string="Confirm Member"
                             class="btn-primary" invisible="membership_state != 'vetted'"
-                            groups="ranchi_centre.group_ranchi_accountant"/>
+                            groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_exit_member" type="object" string="Exit Member"
                             invisible="membership_state != 'confirmed'" groups="ranchi_centre.group_ranchi_manager"
                             confirm="The member will be marked as exited. Continue?"/>
