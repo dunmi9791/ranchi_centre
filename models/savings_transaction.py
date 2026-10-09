@@ -31,7 +31,7 @@ class RanchiSavingsTransaction(models.Model):
         default='draft', required=True, tracking=True, copy=False, index=True)
     origin = fields.Selection(
         [('manual', 'Manual'), ('collection', 'Field Collection'), ('withdrawal', 'Withdrawal Request'),
-         ('interest', 'Interest Run'), ('lapse', 'Lapse Adjustment'), ('api', 'Mobile App')],
+         ('interest', 'Interest Run'), ('lapse', 'Savings Adjustment'), ('api', 'Mobile App')],
         default='manual', required=True, readonly=True)
     journal_id = fields.Many2one(
         'account.journal', check_company=True,

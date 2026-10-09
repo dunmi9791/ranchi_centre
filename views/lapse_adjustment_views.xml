@@ -4,14 +4,19 @@
         <field name="name">ranchi.lapse.adjustment.list</field>
         <field name="model">ranchi.lapse.adjustment</field>
         <field name="arch" type="xml">
-            <list decoration-muted="state == 'cancelled'">
+            <list decoration-muted="state in ('cancelled', 'rejected')" decoration-bf="state == 'submitted'">
                 <field name="name"/>
                 <field name="date"/>
                 <field name="member_id"/>
+                <field name="union_id" optional="show"/>
                 <field name="loan_id"/>
+                <field name="loan_type_id" optional="hide"/>
+                <field name="requested_by_id" optional="show"/>
+                <field name="settle_in_full" optional="hide"/>
                 <field name="savings_used" sum="Total"/>
-                <field name="shortfall" sum="Total"/>
-                <field name="state" widget="badge" decoration-success="state == 'done'"/>
+                <field name="cash_amount" sum="Total" optional="show"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'" decoration-info="state == 'draft'"
+                       decoration-warning="state == 'submitted'" decoration-danger="state == 'rejected'"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
@@ -23,10 +28,15 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_confirm" type="object" string="Confirm" class="btn-primary" invisible="state != 'draft'"
-                            confirm="Settle the loan from savings (and cash shortfall)? This posts a journal entry."/>
-                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                    <button name="action_submit" type="object" string="Request" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_confirm" type="object" string="Confirm &amp; Post" class="btn-primary"
+                            invisible="state not in ('draft', 'submitted')" groups="ranchi_centre.group_ranchi_manager"
+                            confirm="Pay the loan from savings (and any cash shortfall)? This posts a journal entry."/>
+                    <button name="action_reject" type="object" string="Reject" invisible="state != 'submitted'"
+                            groups="ranchi_centre.group_ranchi_manager"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('draft', 'submitted')"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state not in ('rejected', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,done"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -42,34 +52,83 @@
                             <field name="member_id" readonly="state != 'draft'" options="{'no_create': True}"/>
                             <field name="union_id"/>
                             <field name="loan_id" readonly="state != 'draft'" options="{'no_create': True}"/>
-                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="loan_type_id"/>
+                            <field name="date" readonly="state not in ('draft', 'submitted')"/>
                             <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group>
-                            <field name="savings_available"/>
-                            <field name="loan_balance"/>
-                            <field name="savings_used" readonly="state != 'draft'"/>
-                            <field name="shortfall"/>
-                            <field name="journal_id" readonly="state != 'draft'" invisible="shortfall &lt;= 0 and state == 'draft'"
+                            <field name="savings_available" invisible="state not in ('draft', 'submitted')"/>
+                            <field name="loan_balance" invisible="state not in ('draft', 'submitted')"/>
+                            <field name="settle_in_full" readonly="state not in ('draft', 'submitted')"/>
+                            <field name="savings_used" readonly="state not in ('draft', 'submitted')"/>
+                            <field name="shortfall" invisible="not settle_in_full or state not in ('draft', 'submitted')"/>
+                            <field name="cash_amount" invisible="state != 'done'"/>
+                            <field name="journal_id" readonly="state not in ('draft', 'submitted')" invisible="shortfall &lt;= 0"
                                    required="shortfall > 0"/>
                         </group>
                     </group>
-                    <field name="note" placeholder="Reason for the lapse adjustment..."/>
-                    <field name="savings_transaction_id" invisible="not savings_transaction_id"/>
+                    <group string="Approval" invisible="state == 'draft' and not requested_by_id">
+                        <group>
+                            <field name="requested_by_id"/>
+                            <field name="submitted_date"/>
+                        </group>
+                        <group>
+                            <field name="confirmed_by_id" invisible="not confirmed_by_id"/>
+                            <field name="confirmed_date" invisible="not confirmed_by_id"/>
+                            <field name="rejection_reason" invisible="state not in ('submitted', 'rejected')"
+                                   readonly="state != 'submitted'" groups="ranchi_centre.group_ranchi_manager"
+                                   placeholder="Tell the officer why, then click Reject"/>
+                            <field name="rejection_reason" invisible="state != 'rejected'" readonly="1"
+                                   groups="!ranchi_centre.group_ranchi_manager"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Reason for paying the loan from savings..."/>
+                    <group>
+                        <field name="hold_transaction_id" invisible="not hold_transaction_id"/>
+                        <field name="savings_transaction_id" invisible="not savings_transaction_id"/>
+                    </group>
                 </sheet>
                 <chatter/>
             </form>
         </field>
     </record>
 
+    <record id="view_ranchi_lapse_adjustment_search" model="ir.ui.view">
+        <field name="name">ranchi.lapse.adjustment.search</field>
+        <field name="model">ranchi.lapse.adjustment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="member_id"/>
+                <field name="loan_id"/>
+                <field name="union_id"/>
+                <field name="requested_by_id"/>
+                <filter name="to_confirm" string="To Confirm" domain="[('state', '=', 'submitted')]"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="done" string="Posted" domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="my_requests" string="My Requests" domain="[('requested_by_id', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_loan_type" string="Loan Type" context="{'group_by': 'loan_type_id'}"/>
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_ranchi_lapse_adjustment" model="ir.actions.act_window">
-        <field name="name">Lapse Adjustments</field>
+        <field name="name">Savings Adjustments</field>
         <field name="res_model">ranchi.lapse.adjustment</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ranchi_lapse_adjustment_search"/>
+        <field name="context">{'search_default_to_confirm': 1}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Settle a loan from savings</p>
-            <p>Use a lapse adjustment when a member leaves or defaults: their savings pay the loan and any shortfall is collected in cash.</p>
+            <p class="o_view_nocontent_smiling_face">Pay a loan from savings</p>
+            <p>Credit officers request an adjustment from the officer app or here; the member's savings are held
+               until a manager of the loan's product confirms it and the journal entry is posted.
+               Tick <i>Settle in full</i> to close the loan, with any shortfall paid in cash.</p>
         </field>
     </record>
 </odoo>

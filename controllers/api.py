@@ -50,7 +50,31 @@ class RanchiApiV1(http.Controller):
         user = request.env.user
         if not user.has_group('ranchi_centre.group_ranchi_officer'):
             raise Forbidden("User is not a Ranchi credit officer")
+        self._activate_company(user)
         return user
+
+    def _activate_company(self, user):
+        """Work in one branch per request: ``companyId`` from the params (the officer app's branch
+        switcher) or the user's default company. Without this Odoo would use all of the user's
+        companies and mix branches. It travels in the params, not a header, because Odoo's CORS
+        preflight only allows the standard headers."""
+        try:
+            params = (request.get_json_data() or {}).get('params') or {}
+        except Exception:
+            params = {}
+        raw = params.get('companyId') if isinstance(params, dict) else None
+        if raw in (None, '', 0):
+            company = user.company_id
+        else:
+            try:
+                company_id = int(raw)
+            except (TypeError, ValueError):
+                raise BadRequest("companyId must be an integer")
+            company = user.company_ids.filtered(lambda c: c.id == company_id)
+            if not company:
+                raise Forbidden("No access to this branch")
+        request.update_context(allowed_company_ids=[company.id])
+        return company
 
     def _params(self, kw):
         data = dict(kw or {})
@@ -210,6 +234,18 @@ class RanchiApiV1(http.Controller):
             'requestDate': self._date(w.request_date), 'status': w.state, 'reason': w.reason or '',
         }
 
+    def _ser_adjustment(self, a):
+        return {
+            'id': a.id, 'reference': a.name, 'memberId': a.member_id.id, 'memberName': a.member_id.name,
+            'loanId': a.loan_id.id, 'loanNumber': a.loan_id.name, 'date': self._date(a.date),
+            'amount': self._money(a.savings_used), 'settleInFull': a.settle_in_full,
+            'shortfall': self._money(a.cash_amount if a.state == 'done' else a.shortfall),
+            'status': a.state, 'note': a.note or '',
+            'requestedBy': a.requested_by_id.name or None,
+            'confirmedBy': a.confirmed_by_id.name or None,
+            'rejectionReason': a.rejection_reason or None,
+        }
+
     def _ser_collection(self, c):
         return {
             'id': c.id, 'reference': c.name, 'date': self._date(c.date), 'unionId': c.union_id.id,
@@ -229,18 +265,21 @@ class RanchiApiV1(http.Controller):
     # session
     # ------------------------------------------------------------------
     def _me_payload(self, user):
+        company = request.env.company
         employee = request.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
         unions = request.env['ranchi.union'].search([('state', '=', 'active')])
         return {
             'userId': user.id, 'name': user.name, 'email': user.email,
             'employeeId': employee.id or None,
-            'branchId': user.company_id.id, 'branchName': user.company_id.name,
-            'currency': user.company_id.currency_id.name,
+            'branchId': company.id, 'branchName': company.name,
+            'currency': company.currency_id.name,
+            'defaultBranchId': user.company_id.id,
+            'companies': [{'id': c.id, 'name': c.name} for c in user.company_ids.sorted('name')],
             'isManager': user.has_group('ranchi_centre.group_ranchi_manager'),
             'isGeneralManager': user.has_group('ranchi_centre.group_ranchi_general_manager'),
             'managedLoanTypeIds': request.env['ranchi.loan.type'].search(
                 [('manager_ids', 'in', user.id)]).ids,
-            'withdrawalFeePercent': user.company_id.ranchi_withdrawal_fee_percent or 0.0,
+            'withdrawalFeePercent': company.ranchi_withdrawal_fee_percent or 0.0,
             'unions': [self._ser_union(u) for u in unions],
         }
 
@@ -271,6 +310,7 @@ class RanchiApiV1(http.Controller):
         user = request.env.user
         if not user.has_group('ranchi_centre.group_ranchi_officer'):
             raise Forbidden("User is not a Ranchi credit officer")
+        self._activate_company(user)
         name = (data.get('deviceName') or 'Ranchi Officer app')[:100]
         # sudo() keeps the current user but allows a persistent (no expiry) key
         key = request.env['res.users.apikeys'].sudo()._generate(API_KEY_SCOPE, name, None)
@@ -703,6 +743,62 @@ class RanchiApiV1(http.Controller):
         reqs = request.env['ranchi.withdrawal.request'].search(domain, limit=limit, offset=offset)
         return [self._ser_withdrawal(w) for w in reqs]
 
+    @api_route('/api/v1/savings/adjustment/request')
+    def adjustment_request(self, **kw):
+        """Ask a manager to pay a loan from the member's savings. The amount is held at once."""
+        self._authenticate()
+        data = self._params(kw)
+        self._require(data, 'memberId', 'amount')
+
+        def create():
+            member = self._member(data['memberId'])
+            if data.get('loanId'):
+                loan = self._record('ranchi.loan', data['loanId'])
+                if loan.member_id != member:
+                    raise BadRequest("The loan does not belong to this member")
+            else:
+                loan = request.env['ranchi.loan'].search(
+                    [('member_id', '=', member.id), ('state', '=', 'disbursed')], order='date_disbursed, id', limit=1)
+                if not loan:
+                    raise BadRequest("The member has no outstanding loan")
+            adj = request.env['ranchi.lapse.adjustment'].create({
+                'member_id': member.id,
+                'loan_id': loan.id,
+                'company_id': loan.company_id.id,
+                'date': data.get('date') or fields.Date.context_today(request.env.user),
+                'savings_used': float(data['amount']),
+                'settle_in_full': bool(data.get('settleInFull', False)),
+                'note': data.get('note'),
+            })
+            adj.action_submit()
+            return self._ser_adjustment(adj)
+
+        return self._run(lambda: self._idempotent(data, 'savings/adjustment/request', create))
+
+    @api_route('/api/v1/savings/adjustments')
+    def adjustments(self, **kw):
+        self._authenticate()
+        data = self._params(kw)
+        limit, offset = self._paginate(data)
+        domain = []
+        if data.get('memberId'):
+            domain.append(('member_id', '=', int(data['memberId'])))
+        if data.get('status'):
+            domain.append(('state', '=', data['status']))
+        adjs = request.env['ranchi.lapse.adjustment'].search(domain, limit=limit, offset=offset)
+        return [self._ser_adjustment(a) for a in adjs]
+
+    @api_route('/api/v1/savings/adjustment/<int:adjustment_id>/cancel')
+    def adjustment_cancel(self, adjustment_id, **kw):
+        self._authenticate()
+        adj = self._record('ranchi.lapse.adjustment', adjustment_id)
+
+        def cancel():
+            adj.action_cancel()
+            return self._ser_adjustment(adj)
+
+        return self._run(cancel)
+
     # ------------------------------------------------------------------
     # summary
     # ------------------------------------------------------------------
@@ -735,4 +831,6 @@ class RanchiApiV1(http.Controller):
             'awaitingHandoverAmount': self._money(sum(awaiting.mapped('amount_total'))),
             'pendingWithdrawals': request.env['ranchi.withdrawal.request'].search_count(
                 loan_domain + [('state', 'in', ('submitted', 'approved_l1', 'approved'))]),
+            'pendingAdjustments': request.env['ranchi.lapse.adjustment'].search_count(
+                loan_domain + [('state', '=', 'submitted')]),
         }

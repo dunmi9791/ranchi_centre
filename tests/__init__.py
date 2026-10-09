@@ -7,3 +7,5 @@ from . import test_union_loan_type
 from . import test_dashboard
 from . import test_collection_handover
 from . import test_product_managers
+from . import test_holidays
+from . import test_savings_adjustment

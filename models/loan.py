@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from markupsafe import Markup
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_compare, float_is_zero
@@ -143,8 +145,8 @@ class RanchiLoan(models.Model):
             if loan.installment_ids:
                 loan.date_last_due = max(loan.installment_ids.mapped('date_due'))
             elif loan.date_first_due and loan.loan_type_id:
-                loan.date_last_due = loan.date_first_due + loan.loan_type_id._period_delta() * (
-                    loan.loan_type_id.installment_count - 1)
+                loan.date_last_due = loan.loan_type_id._due_dates(
+                    loan.date_first_due, loan.loan_type_id.installment_count, loan.company_id)[-1]
             else:
                 loan.date_last_due = False
 
@@ -334,10 +336,9 @@ class RanchiLoan(models.Model):
             service = currency.round(principal * lt.service_rate / 100.0) if lt.service_collection == 'spread' else 0.0
             base_principal = currency.round(principal / count)
             base_service = currency.round(service / count)
-            due = loan.date_first_due
-            delta = lt._period_delta()
+            dates = lt._due_dates(loan.date_first_due, count, loan.company_id)
             vals_list = []
-            for i in range(1, count + 1):
+            for i, due in enumerate(dates, start=1):
                 p = base_principal if i < count else currency.round(principal - base_principal * (count - 1))
                 s = base_service if i < count else currency.round(service - base_service * (count - 1))
                 vals_list.append({
@@ -347,8 +348,50 @@ class RanchiLoan(models.Model):
                     'amount_principal': p,
                     'amount_service': s,
                 })
-                due = due + delta
             Installment.create(vals_list)
+
+    def _reschedule_for_holidays(self):
+        """Move the unpaid installments due from today onwards off public holidays (and
+        weekends for daily loans). Paid and past installments are left where they are.
+        Returns the loans whose schedule changed."""
+        today = fields.Date.context_today(self)
+        changed = self.browse()
+        for loan in self.filtered(lambda l: l.state in ('approved', 'fees', 'disbursed')):
+            lt = loan.loan_type_id
+            block = loan.installment_ids.filtered(
+                lambda i: i.state != 'paid' and i.date_due >= today).sorted('sequence')
+            if not block:
+                continue
+            if lt.installment_period == 'monthly' and loan.date_first_due:
+                # Monthly loans keep their day of the month: recompute from the nominal dates.
+                all_dates = lt._due_dates(loan.date_first_due, max(block.mapped('sequence')), loan.company_id)
+                dates = [all_dates[inst.sequence - 1] for inst in block]
+            else:
+                dates = lt._due_dates(block[0].date_due, len(block), loan.company_id)
+            moves = []
+            for inst, new_date in zip(block, dates):
+                if inst.date_due == new_date:
+                    continue
+                moves.append((inst.sequence, inst.date_due, new_date))
+                inst.date_due = new_date
+                if inst.move_line_id:
+                    inst.move_line_id.sudo().date_maturity = new_date
+            if moves:
+                changed |= loan
+                lines = Markup().join(
+                    Markup("<li>%s</li>") % _("Installment %(seq)s: %(old)s → %(new)s", seq=seq, old=old, new=new)
+                    for seq, old, new in moves)
+                loan.message_post(body=Markup("%s<ul>%s</ul>") % (_("Schedule moved for public holidays:"), lines))
+        return changed
+
+    def action_reschedule_holidays(self):
+        if self._reschedule_for_holidays():
+            return {'type': 'ir.actions.client', 'tag': 'soft_reload'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {'type': 'info', 'message': _("No upcoming installment falls on a public holiday.")},
+        }
 
     def action_create_fee_invoice(self):
         self.ensure_one()

@@ -50,7 +50,7 @@ access_disbursement_auditor,ranchi.disbursement auditor,model_ranchi_disbursemen
 access_gateway_event_accountant,ranchi.gateway.event accountant,model_ranchi_gateway_event,group_ranchi_accountant,1,0,0,0
 access_gateway_event_general_manager,ranchi.gateway.event general manager,model_ranchi_gateway_event,group_ranchi_general_manager,1,1,1,1
 access_gateway_event_auditor,ranchi.gateway.event auditor,model_ranchi_gateway_event,group_ranchi_auditor,1,0,0,0
-access_lapse_officer,ranchi.lapse.adjustment officer,model_ranchi_lapse_adjustment,group_ranchi_officer,1,0,0,0
+access_lapse_officer,ranchi.lapse.adjustment officer,model_ranchi_lapse_adjustment,group_ranchi_officer,1,1,1,0
 access_lapse_accountant,ranchi.lapse.adjustment accountant,model_ranchi_lapse_adjustment,group_ranchi_accountant,1,1,1,0
 access_lapse_manager,ranchi.lapse.adjustment manager,model_ranchi_lapse_adjustment,group_ranchi_manager,1,1,1,1
 access_lapse_auditor,ranchi.lapse.adjustment auditor,model_ranchi_lapse_adjustment,group_ranchi_auditor,1,0,0,0

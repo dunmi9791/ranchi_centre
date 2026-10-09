@@ -17,7 +17,7 @@ class RanchiLoanRepayment(models.Model):
     date = fields.Date(required=True, default=fields.Date.context_today)
     amount = fields.Monetary(required=True)
     source = fields.Selection(
-        [('collection', 'Field Collection'), ('lapse', 'Lapse Adjustment'),
+        [('collection', 'Field Collection'), ('lapse', 'Savings Adjustment'),
          ('api', 'Mobile App'), ('manual', 'Manual'), ('writeoff', 'Write-off')],
         required=True, default='manual')
     collection_line_id = fields.Many2one('ranchi.collection.line', ondelete='set null')

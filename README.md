@@ -18,7 +18,7 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 | Savings | `ranchi.savings.transaction`, `ranchi.savings.rate` | Deposits, withdrawals, interest, fees, holds on a liability account |
 | Withdrawals | `ranchi.withdrawal.request` | One or two approval levels, hold, fee, payout wizard |
 | Collections | `ranchi.collection`, `ranchi.collection.line` | Union-day event: repayments + savings in one journal entry |
-| Lapse | `ranchi.lapse.adjustment` | Settle a loan from savings, collect shortfall |
+| Savings adjustment | `ranchi.lapse.adjustment` | Pay a loan from savings: officer requests (savings held), the loan product's manager confirms and posts; optional settle-in-full with cash shortfall |
 | API | `controllers/api.py` | `/api/v1/...` JSON-RPC, bearer API key, idempotency keys |
 | Portal | `/my/savings`, `/my/loans` | Members see balances, transactions, schedules |
 | Report | Savings statement | Wizard with date range, running balance |
@@ -62,7 +62,8 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 `/api/v1/installments/today|overdue|upcoming`, `/api/v1/installments/pay`,
 `/api/v1/collections`, `/api/v1/collections/create`, `/api/v1/payment_journals`,
 `/api/v1/savings/balance/<id>`, `/api/v1/savings/deposit`, `/api/v1/savings/withdrawal/request`,
-`/api/v1/savings/withdrawals`, `/api/v1/summary`.
+`/api/v1/savings/withdrawals`, `/api/v1/savings/adjustment/request`, `/api/v1/savings/adjustments`,
+`/api/v1/savings/adjustment/<id>/cancel`, `/api/v1/summary`.
 
 Write endpoints accept `idempotencyKey`. Requests run as the key's user, so credit officers
 only see their unions.

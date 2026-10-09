@@ -32,6 +32,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'views/ranchi_union_views.xml',
         'views/res_partner_views.xml',
         'views/loan_type_views.xml',
+        'views/public_holiday_views.xml',
         'views/loan_installment_views.xml',
         'views/loan_repayment_views.xml',
         'views/loan_views.xml',

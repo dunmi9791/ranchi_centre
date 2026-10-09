@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime, time, timedelta
+
+import pytz
+from dateutil.relativedelta import relativedelta
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -36,12 +41,16 @@ class RanchiLoanType(models.Model):
     installment_count = fields.Integer(string="Number of Installments", required=True, default=20)
     installment_period = fields.Selection(
         [('daily', 'Daily'), ('weekly', 'Weekly'), ('biweekly', 'Every two weeks'), ('monthly', 'Monthly')],
-        required=True, default='weekly')
+        required=True, default='weekly',
+        help="Installments that fall on a public holiday move: weekly and two-weekly ones by one "
+             "week (to the next union day), daily and monthly ones to the next working day. "
+             "Daily installments also skip weekends. For daily, weekly and two-weekly loans the "
+             "later installments move along with it.")
     meeting_frequency = fields.Selection(
         [('weekly', 'Weekly, on the union day'), ('daily', 'Daily, no union day')],
         string="Union Meetings", required=True, default='weekly',
         help="How unions running this loan type meet. Daily unions (e.g. Rapid) have no union day: "
-             "the officer visits them every working day.")
+             "the officer visits them every working day (weekends and public holidays are skipped).")
     manager_ids = fields.Many2many(
         'res.users', 'ranchi_loan_type_manager_rel', 'loan_type_id', 'user_id', string="Field Managers",
         domain=lambda self: [('groups_id', 'in', self.env.ref('ranchi_centre.group_ranchi_manager').id)],
@@ -107,7 +116,6 @@ class RanchiLoanType(models.Model):
 
     def _period_delta(self):
         """Return a relativedelta for one installment period."""
-        from dateutil.relativedelta import relativedelta
         self.ensure_one()
         return {
             'daily': relativedelta(days=1),
@@ -115,6 +123,86 @@ class RanchiLoanType(models.Model):
             'biweekly': relativedelta(weeks=2),
             'monthly': relativedelta(months=1),
         }[self.installment_period]
+
+    # ---- public holidays -------------------------------------------------
+
+    @api.model
+    def _ranchi_holiday_dates(self, company, date_from, date_to):
+        """Return the set of dates between *date_from* and *date_to* (inclusive) covered by a
+        public holiday of *company*. Public holidays are calendar leaves without a resource."""
+        calendar = company.resource_calendar_id
+        tz = pytz.timezone(calendar.tz or company.partner_id.tz or 'UTC')
+        start = tz.localize(datetime.combine(date_from, time.min)).astimezone(pytz.utc).replace(tzinfo=None)
+        stop = tz.localize(datetime.combine(date_to, time.max)).astimezone(pytz.utc).replace(tzinfo=None)
+        leaves = self.env['resource.calendar.leaves'].sudo().search([
+            ('resource_id', '=', False),
+            ('time_type', '=', 'leave'),
+            ('company_id', 'in', [company.id, False]),
+            ('calendar_id', 'in', [calendar.id, False]),
+            ('date_from', '<=', stop),
+            ('date_to', '>=', start),
+        ])
+        days = set()
+        for leave in leaves:
+            day = pytz.utc.localize(leave.date_from).astimezone(tz).date()
+            last = pytz.utc.localize(leave.date_to).astimezone(tz).date()
+            while day <= last:
+                if date_from <= day <= date_to:
+                    days.add(day)
+                day += timedelta(days=1)
+        return days
+
+    def _holiday_shift(self):
+        """Step used to move an installment off a non-working day: union-day loans move to
+        the next meeting a week later, the others to the next day."""
+        self.ensure_one()
+        if self.installment_period in ('weekly', 'biweekly'):
+            return relativedelta(weeks=1)
+        return relativedelta(days=1)
+
+    def _is_non_working(self, day, holidays):
+        self.ensure_one()
+        if day in holidays:
+            return True
+        return self.installment_period == 'daily' and day.weekday() >= 5
+
+    def _due_dates(self, start, count, company):
+        """Return *count* due dates starting at *start*, moved off public holidays (and
+        weekends for daily loans). A moved installment pushes the later ones along with it,
+        except for monthly loans, which keep their day of the month."""
+        self.ensure_one()
+        if count <= 0:
+            return []
+        period = self._period_delta()
+        shift = self._holiday_shift()
+        window_end = start + period * count + relativedelta(months=2)
+        holidays = self._ranchi_holiday_dates(company, start, window_end)
+
+        def next_working(day):
+            nonlocal window_end, holidays
+            for _i in range(400):
+                if day > window_end:
+                    window_end = day + relativedelta(months=6)
+                    holidays = self._ranchi_holiday_dates(company, start, window_end)
+                if not self._is_non_working(day, holidays):
+                    return day
+                day += shift
+            raise UserError(_("Could not find a working day for the %s schedule. Check the public holidays.", self.name))
+
+        dates = []
+        if self.installment_period == 'monthly':
+            for k in range(count):
+                day = start + relativedelta(months=k)
+                if dates and day <= dates[-1]:
+                    day = dates[-1] + timedelta(days=1)
+                dates.append(next_working(day))
+        else:
+            day = start
+            for _k in range(count):
+                day = next_working(day)
+                dates.append(day)
+                day += period
+        return dates
 
 
 class RanchiLoanStage(models.Model):

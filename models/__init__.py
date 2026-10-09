@@ -5,6 +5,7 @@ from . import account_move
 from . import ranchi_union
 from . import res_partner
 from . import loan_type
+from . import resource_calendar_leaves
 from . import loan
 from . import loan_installment
 from . import loan_repayment

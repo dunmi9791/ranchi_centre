@@ -153,6 +153,31 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         listed = self._ok('/api/v1/savings/withdrawals', {'memberId': self.member.id}, key)
         self.assertEqual([w['id'] for w in listed], [req.id])
 
+    def test_officer_requests_savings_adjustment(self):
+        loan = self._disbursed_loan(amount=4000.0)
+        self._deposit(self.member, 3000.0)
+        key = self._key()
+        result = self._ok('/api/v1/savings/adjustment/request', {
+            'memberId': self.member.id, 'amount': 1100.0, 'note': 'Arrears', 'idempotencyKey': 'web-adj-1'}, key)
+        self.assertEqual(result['status'], 'submitted')
+        self.assertEqual(result['loanId'], loan.id)
+        self.assertEqual(result['amount'], 1100.0)
+        again = self._ok('/api/v1/savings/adjustment/request', {
+            'memberId': self.member.id, 'amount': 1100.0, 'idempotencyKey': 'web-adj-1'}, key)
+        self.assertEqual(again['id'], result['id'])
+        adj = self.env['ranchi.lapse.adjustment'].browse(result['id'])
+        self.assertEqual(self.member.savings_available, 1900.0)
+        self.assertEqual(self._ok('/api/v1/summary', {}, key)['pendingAdjustments'], 1)
+
+        # the officer cannot post it through the API or the ORM; the manager does
+        adj.action_confirm()
+        self.assertEqual(adj.state, 'done')
+        listed = self._ok('/api/v1/savings/adjustments', {'memberId': self.member.id}, key)
+        self.assertEqual([(a['id'], a['status']) for a in listed], [(adj.id, 'done')])
+
+        too_much = self._rpc('/api/v1/savings/adjustment/request', {'memberId': self.member.id, 'amount': 5000.0}, key=key)
+        self.assertIn('error', too_much)
+
     def test_officer_creates_member_in_applied_state(self):
         key = self._key()
         result = self._ok('/api/v1/members/create', {
@@ -184,6 +209,37 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         self.assertEqual(loan.guarantor_name, 'Chika Obi')
         listed = self._ok('/api/v1/members/%d/loans' % applicant.id, {}, key)
         self.assertEqual([l['id'] for l in listed], [loan.id])
+
+    def test_officer_switches_branch(self):
+        branch2 = self.env['res.company'].create({'name': 'Karu Branch', 'currency_id': self.company.currency_id.id})
+        self.officer_user.write({'company_ids': [(4, branch2.id)]})
+        officer2 = self.env['hr.employee'].create({
+            'name': 'Officer One (Karu)', 'company_id': branch2.id, 'user_id': self.officer_user.id})
+        union2 = self.env['ranchi.union'].create({
+            'name': 'Karu Union', 'company_id': branch2.id, 'union_day': '2',
+            'loan_type_id': self.loan_type.id, 'credit_officer_id': officer2.id})
+        key = self._key()
+
+        # no companyId: the user's default branch only, never both mixed
+        me = self._ok('/api/v1/me', {}, key)
+        self.assertEqual(me['branchId'], self.company.id)
+        self.assertEqual(me['defaultBranchId'], self.company.id)
+        self.assertEqual({c['id'] for c in me['companies']}, {self.company.id, branch2.id})
+        self.assertEqual([u['id'] for u in self._ok('/api/v1/unions', {}, key)], [self.union.id])
+
+        me2 = self._ok('/api/v1/me', {'companyId': branch2.id}, key)
+        self.assertEqual(me2['branchId'], branch2.id)
+        self.assertEqual(me2['branchName'], 'Karu Branch')
+        self.assertEqual([u['id'] for u in me2['unions']], [union2.id])
+        self.assertEqual([u['id'] for u in self._ok('/api/v1/unions', {'companyId': branch2.id}, key)], [union2.id])
+        self.assertEqual([u['id'] for u in self._ok('/api/v1/unions', {'companyId': self.company.id}, key)], [self.union.id])
+        # a member of the other branch is not reachable from this one
+        denied = self._rpc('/api/v1/members/%d' % self.member.id, {'companyId': branch2.id}, key=key)
+        self.assertIn('error', denied)
+
+        other = self.env['res.company'].create({'name': 'Not Mine'})
+        refused = self._rpc('/api/v1/unions', {'companyId': other.id}, key=key)
+        self.assertIn('error', refused)
 
     def test_officer_is_limited_to_own_unions(self):
         other_officer = self.env['hr.employee'].create({'name': 'Officer Two', 'company_id': self.company.id})

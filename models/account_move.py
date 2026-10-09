@@ -11,7 +11,7 @@ class AccountMove(models.Model):
          ('disbursement', 'Loan Disbursement'),
          ('collection', 'Field Collection'),
          ('savings', 'Savings Transaction'),
-         ('lapse', 'Lapse Adjustment'),
+         ('lapse', 'Savings Adjustment'),
          ('writeoff', 'Loan Write-off')],
         string="Ranchi Operation", copy=False, index=True)
     ranchi_loan_id = fields.Many2one(

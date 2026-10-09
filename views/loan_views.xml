@@ -47,6 +47,9 @@
                             groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_view_disbursement" type="object" string="Disbursement"
                             invisible="not disbursement_id"/>
+                    <button name="action_reschedule_holidays" type="object" string="Apply Holidays"
+                            invisible="state not in ('approved', 'fees', 'disbursed')" groups="ranchi_centre.group_ranchi_manager"
+                            help="Move upcoming unpaid installments that fall on a public holiday."/>
                     <button name="action_open_writeoff_wizard" type="object" string="Write Off"
                             invisible="state != 'disbursed'" groups="ranchi_centre.group_ranchi_manager"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft"
