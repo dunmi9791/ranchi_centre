@@ -2,6 +2,34 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
+# Keep in sync with BUILDING_TYPES in ranchi_officer/src/lib/member.ts (mobile + web officer apps).
+BUILDING_TYPES = [
+    ('face_me', 'Face-me-I-face-you'),
+    ('self_contained', 'Self-contained'),
+    ('apartment', 'Flat / Apartment'),
+    ('bungalow', 'Bungalow'),
+    ('duplex', 'Duplex'),
+    ('shop', 'Shop / Market stall'),
+    ('hotel', 'Hotel'),
+    ('uncompleted', 'Uncompleted building'),
+    ('other', 'Other'),
+]
+# Labels older app builds sent before the apps used the keys above.
+_BUILDING_TYPE_ALIASES = {
+    'flat': 'apartment', 'shop or market stall': 'shop', 'shop attached': 'shop', 'shop / stall': 'shop',
+}
+
+
+def normalize_building_type(value):
+    """Map an API value (key, label or legacy label) to a building_type key; unknown text -> 'other'."""
+    if not value:
+        return False
+    text = str(value).strip().lower()
+    for key, label in BUILDING_TYPES:
+        if text in (key, label.lower()):
+            return key
+    return _BUILDING_TYPE_ALIASES.get(text, 'other')
+
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
@@ -30,9 +58,7 @@ class ResPartner(models.Model):
 
     # ---- residence / business survey -------------------------------------
     landmark = fields.Char()
-    building_type = fields.Selection(
-        [('bungalow', 'Bungalow'), ('duplex', 'Duplex'), ('apartment', 'Apartment'),
-         ('hotel', 'Hotel'), ('uncompleted', 'Uncompleted'), ('shop', 'Shop / Stall')])
+    building_type = fields.Selection(BUILDING_TYPES)
     years_of_occupancy = fields.Integer()
     number_of_portraits = fields.Integer(help="Family portraits seen at the residence during the visit.")
     occupancy_details = fields.Text(string="Branch visit report")

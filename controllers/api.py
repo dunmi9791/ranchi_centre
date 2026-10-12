@@ -20,6 +20,8 @@ from odoo.addons.base.models.res_users import INDEX_SIZE
 from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationError
 from odoo.http import request
 
+from ..models.res_partner import normalize_building_type
+
 _logger = logging.getLogger(__name__)
 API_KEY_SCOPE = 'rpc'
 
@@ -123,6 +125,14 @@ class RanchiApiV1(http.Controller):
         missing = [n for n in names if data.get(n) in (None, '', [])]
         if missing:
             raise BadRequest(f"Missing required field(s): {', '.join(missing)}")
+
+    @staticmethod
+    def _identity_number(data, name, label):
+        """NIN / BVN: optional individually, but 11 digits when given (spaces from grouping ignored)."""
+        value = ''.join(str(data.get(name) or '').split())
+        if value and not (value.isdigit() and len(value) == 11):
+            raise BadRequest(f"{label} must be exactly 11 digits.")
+        return value or None
 
     def _record(self, model, rec_id):
         try:
@@ -396,6 +406,9 @@ class RanchiApiV1(http.Controller):
         self._authenticate()
         data = self._params(kw)
         self._require(data, 'name', 'unionId')
+        nin, bvn = self._identity_number(data, 'nin', 'NIN'), self._identity_number(data, 'bvn', 'BVN')
+        if not nin and not bvn:
+            raise BadRequest("Enter the member's NIN or BVN.")
 
         def create():
             union = self._record('ranchi.union', data['unionId'])
@@ -407,11 +420,11 @@ class RanchiApiV1(http.Controller):
                 'company_id': union.company_id.id,
                 'is_ranchi_member': True,
                 'membership_state': 'applied',
-                'nin': data.get('nin'),
-                'bvn': data.get('bvn'),
+                'nin': nin,
+                'bvn': bvn,
                 'street': data.get('address'),
                 'landmark': data.get('landmark'),
-                'building_type': data.get('buildingType'),
+                'building_type': normalize_building_type(data.get('buildingType')),
                 'years_of_occupancy': data.get('yearsOfOccupancy'),
                 'number_of_portraits': data.get('numberOfPortraits'),
                 'occupancy_details': data.get('occupancyDetails'),

@@ -195,6 +195,22 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         members = self._ok('/api/v1/unions/%d/members' % self.union.id, {}, key)
         self.assertIn(partner.id, [m['id'] for m in members])
 
+    def test_member_create_needs_nin_or_bvn_and_maps_building_type(self):
+        key = self._key()
+        base = {'unionId': self.union.id, 'contactNumber': '08032217745'}
+        missing = self._rpc('/api/v1/members/create', dict(base, name='No Id', idempotencyKey='web-mem-2'), key=key)
+        self.assertIn('error', missing)
+        short = self._rpc('/api/v1/members/create', dict(base, name='Short Nin', nin='1234', idempotencyKey='web-mem-3'), key=key)
+        self.assertIn('error', short)
+        # BVN alone is enough; a label sent by an older app build maps to the stored key
+        result = self._ok('/api/v1/members/create', dict(
+            base, name='Bvn Only', bvn='2201 9945 771', buildingType='Self-contained', idempotencyKey='web-mem-4'), key)
+        partner = self.env['res.partner'].browse(result['id'])
+        self.assertEqual((partner.nin, partner.bvn, partner.building_type), (False, '22019945771', 'self_contained'))
+        result = self._ok('/api/v1/members/create', dict(
+            base, name='Nin Only', nin='22134478906', buildingType='face_me', idempotencyKey='web-mem-5'), key)
+        self.assertEqual(self.env['res.partner'].browse(result['id']).building_type, 'face_me')
+
     def test_officer_submits_loan_application(self):
         applicant = self._make_member('Member B')
         key = self._key()
