@@ -33,6 +33,15 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
   `amount_residual`, so Fully Paid is reached automatically.
 * **Fees**: customer invoices (membership, admin fee, risk premium, up-front service charge)
   on the configured sales journal. The loan moves to Fees Paid when the invoice is paid.
+* **Field fees**: each loan type lists its registration fees, the savings a new member needs
+  before approval, and other fees due before disbursement (fixed or % of the approved amount).
+  Credit officers collect them on a collection line (`amount_fees`). Posting the collection
+  credits the member's receivable and reconciles it with the registration invoice first, then
+  the approved loan's fee invoice (each created if missing). A fully paid registration invoice
+  vets the member (auto-vet setting); a fully paid loan fee invoice moves the loan to Fees Paid.
+  A member is only confirmed once the loan type's registration fees are paid and the savings
+  balance reaches the minimum. Without registration fees on the loan type, the branch
+  membership fee applies and does not block confirmation.
 * **Savings**: deposit Dr Bank / Cr Savings Liability (partner); withdrawal the reverse;
   interest Dr Interest Expense / Cr Liability; fee Dr Liability / Cr Fee Income. Member
   balances are read from posted lines on the liability account. Holds are non-accounting.
@@ -42,7 +51,7 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 1. Install the module. `post_init_hook` points every company at the four fee products.
 2. Ranchi Centre > Configuration > Settings: set the six accounts and four journals, the
    membership fee, savings rules and the disbursement provider.
-3. Create loan types (and stages) with their meeting frequency, a savings interest rate, then unions with a loan type and credit officer. A union's loan type cannot change while it has active loans.
+3. Create loan types (and stages) with their meeting frequency and field fees (Field Fees tab), a savings interest rate, then unions with a loan type and credit officer. A union's loan type cannot change while it has active loans.
 4. Give users a role: Credit Officer, Accountant, Branch Manager or Auditor. A credit
    officer must be linked to an `hr.employee` with a user, and be set on their unions.
 5. For the mobile app (`../ranchi_officer`): the officer signs in with their Odoo login; the app
@@ -67,6 +76,13 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 
 Write endpoints accept `idempotencyKey`. Requests run as the key's user, so credit officers
 only see their unions.
+
+Field fees: members carry `feesDue`, `fees` (`kind` registration/loan, `name`, `due`),
+`savingsRequired` and `savingsDue`, net of collections handed over but not posted yet. Loan
+types carry `registrationFees`, `registrationSavings` and `disbursementFees`. Collection lines
+take `feesAmount`. `members/create` takes `collect: {feesAmount, savingsAmount, journalId?, date?}`
+and returns the member with the submitted registration `collection` (origin `registration`);
+member and collection are created together or not at all.
 
 ## Tests
 

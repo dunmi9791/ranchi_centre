@@ -40,9 +40,16 @@ class RanchiCollection(models.Model):
     line_count = fields.Integer(compute='_compute_totals')
     amount_loan_total = fields.Monetary(compute='_compute_totals', store=True, string="Loan Repayments")
     amount_savings_total = fields.Monetary(compute='_compute_totals', store=True, string="Savings Deposits")
+    amount_fees_total = fields.Monetary(
+        compute='_compute_totals', store=True, string="Fees",
+        help="Registration fees and fees before disbursement collected from the members.")
     amount_total = fields.Monetary(compute='_compute_totals', store=True, string="Total Collected")
     move_id = fields.Many2one('account.move', string="Journal Entry", readonly=True, copy=False)
     note = fields.Text()
+    origin = fields.Selection(
+        [('sheet', 'Collection sheet'), ('registration', 'Member registration')],
+        default='sheet', required=True, readonly=True, copy=False,
+        help="Registration: fees and opening savings the officer took while enrolling a new member.")
     # cash handover: the officer submits, a manager counts the cash and confirms before posting
     submitted_by_id = fields.Many2one('res.users', string="Submitted By", readonly=True, copy=False)
     submitted_date = fields.Datetime(string="Submitted On", readonly=True, copy=False)
@@ -79,16 +86,18 @@ class RanchiCollection(models.Model):
             if col.union_id and not col.credit_officer_id:
                 col.credit_officer_id = col.union_id.credit_officer_id
 
-    @api.depends('line_ids.amount_loan', 'line_ids.amount_savings')
+    @api.depends('line_ids.amount_loan', 'line_ids.amount_savings', 'line_ids.amount_fees')
     def _compute_totals(self):
         for col in self:
             col.line_count = len(col.line_ids)
             col.amount_loan_total = sum(col.line_ids.mapped('amount_loan'))
             col.amount_savings_total = sum(col.line_ids.mapped('amount_savings'))
-            col.amount_total = col.amount_loan_total + col.amount_savings_total
+            col.amount_fees_total = sum(col.line_ids.mapped('amount_fees'))
+            col.amount_total = col.amount_loan_total + col.amount_savings_total + col.amount_fees_total
 
     def action_fill_due_installments(self):
-        """Add one line per member of the union with an installment due on or before the collection date."""
+        """Add one line per member of the union with an installment or a fee due on or before the
+        collection date."""
         self.ensure_one()
         if self.state != 'draft':
             raise UserError(_("Only draft collections can be pre-filled."))
@@ -106,6 +115,14 @@ class RanchiCollection(models.Model):
                 'loan_id': loan.id,
                 'amount_loan': sum(due.mapped('amount_residual')),
             }))
+        with_lines = self.line_ids.member_id | self.env['res.partner'].browse([l[2]['member_id'] for l in lines])
+        members = self.env['res.partner'].search([
+            ('is_ranchi_member', '=', True), ('union_id', '=', self.union_id.id),
+            ('membership_state', '!=', 'exited'), ('id', 'not in', with_lines.ids)])
+        for member in members:
+            fees = member._fees_due_total() - member._pending_collected('amount_fees')
+            if not self.currency_id.is_zero(fees) and fees > 0:
+                lines.append((0, 0, {'member_id': member.id, 'amount_fees': fees}))
         if lines:
             self.write({'line_ids': lines})
         return True
@@ -195,6 +212,7 @@ class RanchiCollection(models.Model):
         liability = None
         if not currency.is_zero(self.amount_savings_total):
             liability = company._ranchi_require('ranchi_savings_liability_account_id')
+        fee_settlements = {}  # credit line label -> the invoice's open receivable lines
 
         lines = [(0, 0, {
             'name': _("Collection %(ref)s - %(union)s", ref=self.name, union=self.union_id.name),
@@ -218,6 +236,31 @@ class RanchiCollection(models.Model):
                     'debit': 0.0,
                     'credit': line.amount_savings,
                 }))
+            if not currency.is_zero(line.amount_fees):
+                remaining = line.amount_fees
+                invoices = line.member_id._fee_invoices_to_settle()
+                for invoice in invoices:
+                    if currency.compare_amounts(remaining, 0.0) <= 0:
+                        break
+                    portion = min(remaining, invoice.amount_residual)
+                    remaining = currency.round(remaining - portion)
+                    receivable = invoice.line_ids.filtered(
+                        lambda l: l.display_type == 'payment_term' and not l.reconciled)
+                    label = _("%(ref)s fees %(invoice)s", ref=self.name, invoice=invoice.name)
+                    lines.append((0, 0, {
+                        'name': label,
+                        'account_id': receivable[:1].account_id.id,
+                        'partner_id': line.member_id.id,
+                        'debit': 0.0,
+                        'credit': portion,
+                    }))
+                    fee_settlements[label] = receivable
+                    line.fee_move_ids = [(4, invoice.id)]
+                if currency.compare_amounts(remaining, 0.0) > 0:
+                    raise UserError(_(
+                        "%(member)s paid %(paid)s of fees on %(ref)s but only %(due)s is due.",
+                        member=line.member_id.display_name, paid=currency.format(line.amount_fees),
+                        ref=self.name, due=currency.format(line.amount_fees - remaining)))
         move = self.env['account.move'].create({
             'move_type': 'entry',
             'journal_id': self.journal_id.id,
@@ -228,6 +271,11 @@ class RanchiCollection(models.Model):
             'line_ids': lines,
         })
         move.action_post()
+        # Reconciling settles the fee invoices; once one is fully paid its hook moves the loan to
+        # 'Fees Paid' or vets the new member.
+        for label, receivable in fee_settlements.items():
+            credit = move.line_ids.filtered(lambda l: l.name == label and l.credit)
+            (credit | receivable).reconcile()
 
         Tx = self.env['ranchi.savings.transaction']
         for line in self.line_ids:
@@ -302,6 +350,14 @@ class RanchiCollectionLine(models.Model):
     amount_due = fields.Monetary(compute='_compute_amount_due', string="Due Today")
     amount_loan = fields.Monetary(string="Loan Repayment", default=0.0)
     amount_savings = fields.Monetary(string="Savings Deposit", default=0.0)
+    amount_fees = fields.Monetary(
+        string="Fees", default=0.0,
+        help="Registration fees and fees before disbursement paid by the member. They settle the "
+             "registration invoice first, then the fee invoice of the approved loan.")
+    fees_due = fields.Monetary(compute='_compute_fees_due', string="Fees Due")
+    fee_move_ids = fields.Many2many(
+        'account.move', 'ranchi_collection_line_fee_move_rel', 'line_id', 'move_id',
+        string="Fee Invoices Settled", readonly=True, copy=False)
     amount_total = fields.Monetary(compute='_compute_amount_total', store=True)
     repayment_ids = fields.One2many('ranchi.loan.repayment', 'collection_line_id')
     savings_transaction_id = fields.Many2one('ranchi.savings.transaction', readonly=True)
@@ -327,10 +383,15 @@ class RanchiCollectionLine(models.Model):
         if any(line.collection_id.state != 'draft' for line in self):
             raise UserError(_("Lines can only be changed while the collection is a draft."))
 
-    @api.depends('amount_loan', 'amount_savings')
+    @api.depends('amount_loan', 'amount_savings', 'amount_fees')
     def _compute_amount_total(self):
         for line in self:
-            line.amount_total = line.amount_loan + line.amount_savings
+            line.amount_total = line.amount_loan + line.amount_savings + line.amount_fees
+
+    @api.depends('member_id')
+    def _compute_fees_due(self):
+        for line in self:
+            line.fees_due = line.member_id._fees_due_total() if line.member_id else 0.0
 
     @api.depends('loan_id', 'collection_id.date')
     def _compute_amount_due(self):
@@ -345,12 +406,17 @@ class RanchiCollectionLine(models.Model):
         if self.member_id and self.loan_id.member_id != self.member_id:
             self.loan_id = self.member_id.active_loan_id if self.member_id.active_loan_id.state == 'disbursed' else False
 
+    @api.onchange('member_id')
+    def _onchange_member_fees(self):
+        if self.member_id and not self.amount_fees and self.fees_due > 0:
+            self.amount_fees = self.fees_due
+
     @api.onchange('loan_id')
     def _onchange_loan_id(self):
         if self.loan_id and not self.amount_loan:
             self.amount_loan = self.amount_due
 
-    @api.constrains('amount_loan', 'amount_savings', 'loan_id', 'member_id')
+    @api.constrains('amount_loan', 'amount_savings', 'amount_fees', 'loan_id', 'member_id')
     def _check_line(self):
         for line in self:
             line._validate()
@@ -358,10 +424,22 @@ class RanchiCollectionLine(models.Model):
     def _validate(self):
         self.ensure_one()
         currency = self.currency_id
-        if self.amount_loan < 0 or self.amount_savings < 0:
+        if self.amount_loan < 0 or self.amount_savings < 0 or self.amount_fees < 0:
             raise ValidationError(_("Amounts cannot be negative."))
-        if currency and currency.is_zero(self.amount_loan) and currency.is_zero(self.amount_savings):
-            raise ValidationError(_("Enter a loan repayment or a savings deposit for %s.", self.member_id.display_name))
+        if currency and currency.is_zero(self.amount_loan) and currency.is_zero(self.amount_savings) \
+                and currency.is_zero(self.amount_fees):
+            raise ValidationError(_(
+                "Enter a loan repayment, a savings deposit or fees for %s.", self.member_id.display_name))
+        if currency and not currency.is_zero(self.amount_fees) and self.state in ('draft', 'submitted'):
+            due = self.member_id._fees_due_total()
+            if self.state == 'draft':
+                # other collections already handed over will settle part of it
+                due -= self.member_id._pending_collected('amount_fees')
+            if currency.compare_amounts(self.amount_fees, due) > 0:
+                raise ValidationError(_(
+                    "%(member)s owes %(due)s of fees; %(paid)s was entered.",
+                    member=self.member_id.display_name, due=currency.format(due),
+                    paid=currency.format(self.amount_fees)))
         if self.amount_loan and not self.loan_id:
             raise ValidationError(_("Select the loan being repaid by %s.", self.member_id.display_name))
         if self.loan_id and self.loan_id.member_id != self.member_id:
@@ -375,3 +453,4 @@ class RanchiCollectionLine(models.Model):
             raise ValidationError(_(
                 "The repayment for %(loan)s (%(amount)s) exceeds its balance (%(balance)s).",
                 loan=self.loan_id.name, amount=self.amount_loan, balance=self.loan_id.balance))
+

@@ -61,7 +61,14 @@ class RanchiLoan(models.Model):
     service_amount = fields.Monetary(compute='_compute_amounts', string="Service Charge")
     admin_fee_amount = fields.Monetary(compute='_compute_amounts', string="Administration Fee")
     risk_premium_amount = fields.Monetary(compute='_compute_amounts', string="Risk Premium")
+    other_fee_amount = fields.Monetary(
+        compute='_compute_amounts', string="Other Fees",
+        help="Fees before disbursement listed on the loan type, besides the administration fee, "
+             "risk premium and upfront service charge.")
     fee_total = fields.Monetary(compute='_compute_amounts', string="Fees Before Disbursement")
+    fee_residual = fields.Monetary(
+        compute='_compute_fee_residual', string="Fees Still Due",
+        help="What the credit officer still has to collect before the loan can be disbursed.")
     total_repayable = fields.Monetary(compute='_compute_amounts', string="Total Repayable")
     installment_amount = fields.Monetary(compute='_compute_amounts')
     installment_count = fields.Integer(related='loan_type_id.installment_count')
@@ -153,7 +160,9 @@ class RanchiLoan(models.Model):
     @api.depends('amount_applied', 'amount_approved', 'loan_type_id', 'state',
                  'loan_type_id.service_rate', 'loan_type_id.admin_charge',
                  'loan_type_id.risk_premium_rate', 'loan_type_id.installment_count',
-                 'loan_type_id.service_collection', 'installment_ids.amount_total')
+                 'loan_type_id.service_collection', 'installment_ids.amount_total',
+                 'loan_type_id.disbursement_fee_ids.amount', 'loan_type_id.disbursement_fee_ids.rate',
+                 'loan_type_id.disbursement_fee_ids.amount_type', 'loan_type_id.disbursement_fee_ids.active')
     def _compute_amounts(self):
         for loan in self:
             currency = loan.currency_id
@@ -166,14 +175,30 @@ class RanchiLoan(models.Model):
             loan.service_amount = service
             loan.admin_fee_amount = lt.admin_charge or 0.0
             loan.risk_premium_amount = risk
+            loan.other_fee_amount = sum(
+                fee._amount_for(principal, currency) for fee in lt.disbursement_fee_ids) if currency else 0.0
             upfront = lt.service_collection == 'upfront'
-            loan.fee_total = loan.admin_fee_amount + risk + (service if upfront else 0.0)
+            loan.fee_total = loan.admin_fee_amount + risk + loan.other_fee_amount + (service if upfront else 0.0)
             if loan.installment_ids:
                 loan.total_repayable = sum(loan.installment_ids.mapped('amount_total'))
             else:
                 loan.total_repayable = principal + (0.0 if upfront else service)
             count = lt.installment_count or 0
             loan.installment_amount = currency.round(loan.total_repayable / count) if count and currency else 0.0
+
+    @api.depends('state', 'fee_total', 'fee_move_id.amount_residual', 'fee_move_id.state')
+    def _compute_fee_residual(self):
+        for loan in self:
+            if loan.state != 'approved':
+                loan.fee_residual = 0.0
+                continue
+            invoice = loan.sudo().fee_move_id
+            if invoice and invoice.state == 'posted':
+                loan.fee_residual = invoice.amount_residual
+            elif invoice and invoice.state == 'draft':
+                loan.fee_residual = invoice.amount_total
+            else:
+                loan.fee_residual = loan.fee_total
 
     @api.depends('installment_ids.amount_residual', 'installment_ids.amount_total', 'state')
     def _compute_balance(self):
@@ -393,35 +418,44 @@ class RanchiLoan(models.Model):
             'params': {'type': 'info', 'message': _("No upcoming installment falls on a public holiday.")},
         }
 
-    def action_create_fee_invoice(self):
+    def _fee_items(self):
+        """Fees due before disbursement, in invoice order: [{'name', 'amount', 'product'}].
+
+        'product' is a product record or the name of the branch setting holding it, so the
+        list can be shown before the branch products are configured."""
         self.ensure_one()
-        if self.state != 'approved':
-            raise UserError(_("Fees are invoiced once the loan is approved."))
-        if self.fee_move_id and self.fee_move_id.state != 'cancel':
-            return self._action_open_move(self.fee_move_id)
-        if self.currency_id.is_zero(self.fee_total):
-            self._on_fees_paid()
-            return True
+        currency = self.currency_id
+        items = [
+            {'name': _("Loan Administration Fee"), 'amount': self.admin_fee_amount,
+             'product': 'ranchi_admin_fee_product_id'},
+            {'name': _("Risk Premium"), 'amount': self.risk_premium_amount,
+             'product': 'ranchi_risk_premium_product_id'},
+        ]
+        if self.service_collection == 'upfront':
+            items.append({'name': _("Service Charge"), 'amount': self.service_amount,
+                          'product': 'ranchi_service_charge_product_id'})
+        for fee in self.loan_type_id.disbursement_fee_ids:
+            items.append({'name': fee.name, 'amount': fee._amount_for(self.principal, currency),
+                          'product': fee.product_id or 'ranchi_admin_fee_product_id'})
+        return [item for item in items if not currency.is_zero(item['amount'])]
+
+    def _create_fee_invoice(self):
+        """Create and post the invoice of the fees due before disbursement; returns it."""
+        self.ensure_one()
         company = self.company_id
         journal = company._ranchi_require('ranchi_fee_journal_id')
         lines = []
-
-        def add_line(product_field, label, amount):
-            if self.currency_id.is_zero(amount):
-                return
-            product = company._ranchi_require(product_field)
+        for item in self._fee_items():
+            product = item['product']
+            if isinstance(product, str):
+                product = company._ranchi_require(product)
             lines.append((0, 0, {
                 'product_id': product.id,
-                'name': f"{label} - {self.name}",
+                'name': f"{item['name']} - {self.name}",
                 'quantity': 1.0,
-                'price_unit': amount,
+                'price_unit': item['amount'],
                 'tax_ids': [(6, 0, product.taxes_id.filtered(lambda t: t.company_id == company).ids)],
             }))
-
-        add_line('ranchi_admin_fee_product_id', _("Loan Administration Fee"), self.admin_fee_amount)
-        add_line('ranchi_risk_premium_product_id', _("Risk Premium"), self.risk_premium_amount)
-        if self.service_collection == 'upfront':
-            add_line('ranchi_service_charge_product_id', _("Service Charge"), self.service_amount)
         invoice = self.env['account.move'].create({
             'move_type': 'out_invoice',
             'partner_id': self.member_id.id,
@@ -437,7 +471,18 @@ class RanchiLoan(models.Model):
         invoice.action_post()
         self.fee_move_id = invoice
         self.message_post(body=_("Fee invoice %s created.", invoice.name))
-        return self._action_open_move(invoice)
+        return invoice
+
+    def action_create_fee_invoice(self):
+        self.ensure_one()
+        if self.state != 'approved':
+            raise UserError(_("Fees are invoiced once the loan is approved."))
+        if self.fee_move_id and self.fee_move_id.state != 'cancel':
+            return self._action_open_move(self.fee_move_id)
+        if self.currency_id.is_zero(self.fee_total):
+            self._on_fees_paid()
+            return True
+        return self._action_open_move(self._create_fee_invoice())
 
     def _on_fees_paid(self):
         for loan in self:

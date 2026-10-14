@@ -195,6 +195,55 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         members = self._ok('/api/v1/unions/%d/members' % self.union.id, {}, key)
         self.assertIn(partner.id, [m['id'] for m in members])
 
+    def test_member_create_with_registration_collection(self):
+        """Fees and opening savings taken at enrolment become a collection handed over with the
+        officer's cash; the sheet then shows what is still due."""
+        self.loan_type.write({
+            'registration_savings': 1000.0,
+            'fee_ids': [(0, 0, {'name': 'Registration form', 'stage': 'registration', 'amount': 800.0})],
+        })
+        key = self._key()
+        types = self._ok('/api/v1/loantypes', {}, key)
+        lt = next(t for t in types if t['id'] == self.loan_type.id)
+        self.assertEqual(lt['registrationFees'], [{'id': self.loan_type.registration_fee_ids.id,
+                                                   'name': 'Registration form', 'amount': 800.0}])
+        self.assertEqual(lt['registrationSavings'], 1000.0)
+        result = self._ok('/api/v1/members/create', {
+            'name': 'Hauwa Musa', 'unionId': self.union.id, 'contactNumber': '08032217745',
+            'nin': '22134478911', 'collect': {'feesAmount': 800.0, 'savingsAmount': 400.0},
+            'idempotencyKey': 'web-mem-fees-1'}, key)
+        col = result['collection']
+        self.assertEqual((col['status'], col['feesTotal'], col['savingsTotal'], col['total']),
+                         ('submitted', 800.0, 400.0, 1200.0))
+        self.assertEqual(col['lines'][0]['feesAmount'], 800.0)
+        # handed over but not posted: nothing more to collect in fees, 600 of savings left
+        self.assertEqual((result['feesDue'], result['savingsRequired'], result['savingsDue']), (0.0, 1000.0, 600.0))
+
+        too_much = self._rpc('/api/v1/members/create', {
+            'name': 'Too Much', 'unionId': self.union.id, 'nin': '22134478912',
+            'collect': {'feesAmount': 900.0}, 'idempotencyKey': 'web-mem-fees-2'}, key=key)
+        self.assertIn('error', too_much)
+        self.assertFalse(self.env['res.partner'].search([('name', '=', 'Too Much')]), "rolled back with the collection")
+
+        line = self._ok('/api/v1/collections/create', {
+            'unionId': self.union.id, 'idempotencyKey': 'col-fees-1',
+            'lines': [{'memberId': result['id'], 'savingsAmount': 600.0}]}, key)
+        self.assertEqual(line['total'], 600.0)
+
+    def test_member_create_stores_photos(self):
+        key = self._key()
+        png = ('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+        base = {'unionId': self.union.id, 'contactNumber': '08032217745', 'nin': '22134478907', 'photoRequired': True}
+        no_photo = self._rpc('/api/v1/members/create', dict(base, name='No Photo', idempotencyKey='web-mem-6'), key=key)
+        self.assertIn('error', no_photo)
+        bad = self._rpc('/api/v1/members/create', dict(base, name='Bad Photo', photo='not-base64!', idempotencyKey='web-mem-7'), key=key)
+        self.assertIn('error', bad)
+        result = self._ok('/api/v1/members/create', dict(
+            base, name='With Photos', photo='data:image/png;base64,' + png, idCardPhoto=png, idempotencyKey='web-mem-8'), key)
+        partner = self.env['res.partner'].browse(result['id'])
+        self.assertTrue(partner.image_1920)
+        self.assertTrue(partner.id_card_image)
+
     def test_member_create_needs_nin_or_bvn_and_maps_building_type(self):
         key = self._key()
         base = {'unionId': self.union.id, 'contactNumber': '08032217745'}

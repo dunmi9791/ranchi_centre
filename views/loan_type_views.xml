@@ -75,6 +75,47 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Field Fees" name="fees">
+                            <group>
+                                <group string="Registration">
+                                    <field name="registration_savings"/>
+                                </group>
+                            </group>
+                            <div class="text-muted mb-2">
+                                Collected by the credit officer from a new member, with the union's collection.
+                                Without any fee here the branch membership fee applies. The membership is only
+                                confirmed once these fees are paid and the savings above are in.
+                            </div>
+                            <field name="registration_fee_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" placeholder="e.g. Registration form"/>
+                                    <field name="amount"/>
+                                    <field name="product_id" optional="hide" options="{'no_create': True}"/>
+                                    <field name="stage" column_invisible="1"/>
+                                    <field name="amount_type" column_invisible="1"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <separator string="Other Fees Before Disbursement"/>
+                            <div class="text-muted mb-2">
+                                Invoiced once a loan is approved, with the administration fee, risk premium and
+                                upfront service charge above. The credit officer collects them before the loan is
+                                disbursed.
+                            </div>
+                            <field name="disbursement_fee_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" placeholder="e.g. Loan form"/>
+                                    <field name="amount_type"/>
+                                    <field name="amount" readonly="amount_type != 'fixed'"/>
+                                    <field name="rate" readonly="amount_type != 'percent'"/>
+                                    <field name="product_id" optional="hide" options="{'no_create': True}"/>
+                                    <field name="stage" column_invisible="1"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Description" name="description">
                             <field name="description"/>
                         </page>

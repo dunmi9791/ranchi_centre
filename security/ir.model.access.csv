@@ -8,6 +8,10 @@ access_loan_type_officer,ranchi.loan.type officer,model_ranchi_loan_type,group_r
 access_loan_type_general_manager,ranchi.loan.type general manager,model_ranchi_loan_type,group_ranchi_general_manager,1,1,1,1
 access_loan_type_auditor,ranchi.loan.type auditor,model_ranchi_loan_type,group_ranchi_auditor,1,0,0,0
 access_loan_type_portal,ranchi.loan.type portal,model_ranchi_loan_type,base.group_portal,1,0,0,0
+access_loan_type_fee_officer,ranchi.loan.type.fee officer,model_ranchi_loan_type_fee,group_ranchi_officer,1,0,0,0
+access_loan_type_fee_general_manager,ranchi.loan.type.fee general manager,model_ranchi_loan_type_fee,group_ranchi_general_manager,1,1,1,1
+access_loan_type_fee_auditor,ranchi.loan.type.fee auditor,model_ranchi_loan_type_fee,group_ranchi_auditor,1,0,0,0
+access_loan_type_fee_portal,ranchi.loan.type.fee portal,model_ranchi_loan_type_fee,base.group_portal,1,0,0,0
 access_loan_stage_officer,ranchi.loan.stage officer,model_ranchi_loan_stage,group_ranchi_officer,1,0,0,0
 access_loan_stage_general_manager,ranchi.loan.stage general manager,model_ranchi_loan_stage,group_ranchi_general_manager,1,1,1,1
 access_loan_stage_auditor,ranchi.loan.stage auditor,model_ranchi_loan_stage,group_ranchi_auditor,1,0,0,0

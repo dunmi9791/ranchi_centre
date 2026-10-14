@@ -77,6 +77,47 @@
             <field name="manager_ids" eval="[(4, ref('demo_user_rapid_manager'))]"/>
         </record>
 
+        <!-- fees the credit officer collects in the field -->
+        <record id="demo_loan_type_weekly" model="ranchi.loan.type">
+            <field name="registration_savings">2000.0</field>
+        </record>
+        <record id="demo_fee_weekly_registration" model="ranchi.loan.type.fee">
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="stage">registration</field>
+            <field name="sequence">1</field>
+            <field name="name">Registration fee</field>
+            <field name="amount">1000.0</field>
+        </record>
+        <record id="demo_fee_weekly_passbook" model="ranchi.loan.type.fee">
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="stage">registration</field>
+            <field name="sequence">2</field>
+            <field name="name">Passbook</field>
+            <field name="amount">500.0</field>
+        </record>
+        <record id="demo_fee_weekly_loan_form" model="ranchi.loan.type.fee">
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="stage">disbursement</field>
+            <field name="name">Loan form</field>
+            <field name="amount">500.0</field>
+        </record>
+        <record id="demo_fee_weekly_insurance" model="ranchi.loan.type.fee">
+            <field name="loan_type_id" ref="demo_loan_type_weekly"/>
+            <field name="stage">disbursement</field>
+            <field name="name">Credit life insurance</field>
+            <field name="amount_type">percent</field>
+            <field name="rate">0.5</field>
+        </record>
+        <record id="demo_loan_type_rapid" model="ranchi.loan.type">
+            <field name="registration_savings">1000.0</field>
+        </record>
+        <record id="demo_fee_rapid_registration" model="ranchi.loan.type.fee">
+            <field name="loan_type_id" ref="demo_loan_type_rapid"/>
+            <field name="stage">registration</field>
+            <field name="name">Registration fee</field>
+            <field name="amount">500.0</field>
+        </record>
+
         <record id="demo_savings_rate" model="ranchi.savings.rate">
             <field name="name">Standard savings rate</field>
             <field name="rate_type">flat</field>

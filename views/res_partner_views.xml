@@ -51,11 +51,18 @@
                             <field name="membership_date"/>
                             <field name="exit_date" invisible="not exit_date"/>
                             <field name="membership_fee_move_id" invisible="not membership_fee_move_id"/>
+                            <field name="registration_fee_total" invisible="membership_state not in ('applied', 'vetted')"/>
+                            <field name="registration_fee_residual" invisible="membership_state not in ('applied', 'vetted')"
+                                   decoration-danger="registration_fee_residual > 0"/>
+                            <field name="registration_savings_required" invisible="not registration_savings_required"/>
+                            <field name="registration_savings_due" invisible="not registration_savings_required"
+                                   decoration-danger="registration_savings_due > 0"/>
                             <field name="loan_cycle"/>
                         </group>
                         <group string="Identity &amp; Next of Kin">
                             <field name="nin"/>
                             <field name="bvn"/>
+                            <field name="id_card_image" widget="image" options="{'size': [240, 0]}"/>
                             <field name="next_of_kin"/>
                             <field name="next_of_kin_relationship"/>
                             <field name="next_of_kin_phone" widget="phone"/>

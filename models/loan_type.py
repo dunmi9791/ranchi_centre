@@ -63,6 +63,22 @@ class RanchiLoanType(models.Model):
     max_amount = fields.Monetary(currency_field='currency_id', default=0.0,
                                  help="0 means no ceiling at loan type level.")
     stage_ids = fields.One2many('ranchi.loan.stage', 'loan_type_id', string="Stages")
+    # Fees the credit officer collects in the field, on top of the charges above.
+    fee_ids = fields.One2many('ranchi.loan.type.fee', 'loan_type_id', string="Fees")
+    registration_fee_ids = fields.One2many(
+        'ranchi.loan.type.fee', 'loan_type_id', string="Registration Fees",
+        domain=[('stage', '=', 'registration')], context={'default_stage': 'registration'},
+        help="Collected by the credit officer when a member joins a union running this loan type. "
+             "They replace the branch membership fee and must be paid before the membership is confirmed.")
+    disbursement_fee_ids = fields.One2many(
+        'ranchi.loan.type.fee', 'loan_type_id', string="Other Fees Before Disbursement",
+        domain=[('stage', '=', 'disbursement')], context={'default_stage': 'disbursement'},
+        help="Invoiced with the administration fee and risk premium once a loan is approved, "
+             "and collected by the credit officer before the loan is disbursed.")
+    registration_savings = fields.Monetary(
+        string="Savings Before Approval", currency_field='currency_id', default=0.0,
+        help="Savings balance a new member must reach before the membership is confirmed. The credit "
+             "officer collects it with the registration fees. 0 means no minimum.")
     loan_count = fields.Integer(compute='_compute_loan_count')
     union_ids = fields.One2many('ranchi.union', 'loan_type_id', string="Unions")
     union_count = fields.Integer(compute='_compute_union_count')
@@ -104,9 +120,12 @@ class RanchiLoanType(models.Model):
         action['context'] = {'default_loan_type_id': self.id, 'search_default_active_state': 1}
         return action
 
-    @api.constrains('installment_count', 'service_rate', 'risk_premium_rate', 'min_amount', 'max_amount')
+    @api.constrains('installment_count', 'service_rate', 'risk_premium_rate', 'min_amount', 'max_amount',
+                    'registration_savings')
     def _check_values(self):
         for rec in self:
+            if rec.registration_savings < 0:
+                raise ValidationError(_("The savings required before approval cannot be negative."))
             if rec.installment_count <= 0:
                 raise ValidationError(_("The number of installments must be greater than zero."))
             if rec.service_rate < 0 or rec.risk_premium_rate < 0:
@@ -227,3 +246,60 @@ class RanchiLoanStage(models.Model):
                 raise ValidationError(_("The maximum principal must be positive."))
             if rec.min_cycle < 0:
                 raise ValidationError(_("The required loan cycle cannot be negative."))
+
+
+class RanchiLoanTypeFee(models.Model):
+    _name = 'ranchi.loan.type.fee'
+    _description = 'Ranchi Loan Type Fee'
+    _order = 'loan_type_id, stage, sequence, id'
+
+    sequence = fields.Integer(default=10)
+    loan_type_id = fields.Many2one('ranchi.loan.type', required=True, ondelete='cascade', index=True)
+    company_id = fields.Many2one(related='loan_type_id.company_id')
+    currency_id = fields.Many2one(related='loan_type_id.currency_id')
+    name = fields.Char(required=True, translate=True, help="Shown to the credit officer and on the invoice.")
+    stage = fields.Selection(
+        [('registration', 'At registration'), ('disbursement', 'Before disbursement')],
+        required=True, default='registration',
+        help="Registration fees are paid once, when the member joins. Fees before disbursement are "
+             "charged on every loan once it is approved.")
+    amount_type = fields.Selection(
+        [('fixed', 'Fixed amount'), ('percent', '% of the approved amount')],
+        string="Computation", required=True, default='fixed')
+    amount = fields.Monetary(string="Amount", currency_field='currency_id', default=0.0)
+    rate = fields.Float(string="Rate (%)", digits=(5, 2), default=0.0)
+    product_id = fields.Many2one(
+        'product.product', string="Product", domain="[('sale_ok', '=', True)]",
+        help="Decides the income account. Empty: the branch membership fee product for registration "
+             "fees, the loan administration fee product for fees before disbursement.")
+    active = fields.Boolean(default=True)
+
+    @api.constrains('stage', 'amount_type', 'amount', 'rate')
+    def _check_fee(self):
+        for fee in self:
+            if fee.amount < 0 or fee.rate < 0:
+                raise ValidationError(_("Fee amounts cannot be negative."))
+            if fee.stage == 'registration' and fee.amount_type == 'percent':
+                raise ValidationError(_(
+                    "%s: registration fees are paid before any loan exists, so they must be a fixed amount.",
+                    fee.name))
+
+    @api.onchange('stage')
+    def _onchange_stage(self):
+        if self.stage == 'registration':
+            self.amount_type = 'fixed'
+
+    def _amount_for(self, principal, currency):
+        """Amount of this fee for a loan of *principal* (ignored for fixed fees)."""
+        self.ensure_one()
+        if self.amount_type == 'percent':
+            return currency.round(principal * self.rate / 100.0)
+        return currency.round(self.amount)
+
+    def _product(self, company):
+        """The fee's product, or the branch default for its stage."""
+        self.ensure_one()
+        if self.product_id:
+            return self.product_id
+        field = 'ranchi_membership_product_id' if self.stage == 'registration' else 'ranchi_admin_fee_product_id'
+        return company._ranchi_require(field)

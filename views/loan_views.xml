@@ -99,7 +99,9 @@
                             <field name="service_amount"/>
                             <field name="admin_fee_amount"/>
                             <field name="risk_premium_amount"/>
+                            <field name="other_fee_amount" invisible="not other_fee_amount"/>
                             <field name="fee_total"/>
+                            <field name="fee_residual" invisible="state != 'approved'" decoration-danger="fee_residual > 0"/>
                             <field name="fee_payment_state" invisible="not fee_move_id"/>
                         </group>
                         <group string="Position">

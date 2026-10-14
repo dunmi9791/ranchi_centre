@@ -9,6 +9,8 @@ Keys are created by the user under Preferences > Account Security.
 Write endpoints accept an optional ``idempotencyKey``: replaying the same key
 returns the first response instead of creating a second record.
 """
+import base64
+import binascii
 import json
 import logging
 from datetime import timedelta
@@ -134,6 +136,26 @@ class RanchiApiV1(http.Controller):
             raise BadRequest(f"{label} must be exactly 11 digits.")
         return value or None
 
+    MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+    def _image(self, data, name, label):
+        """Base64 image from a data URL or raw base64; checked, returned as base64 for an Image field."""
+        value = data.get(name)
+        if not value:
+            return None
+        value = str(value)
+        if value.startswith('data:'):
+            header, _sep, value = value.partition(',')
+            if not header.startswith('data:image/'):
+                raise BadRequest(f"{label} must be an image.")
+        try:
+            raw = base64.b64decode(value, validate=True)
+        except (binascii.Error, ValueError):
+            raise BadRequest(f"{label} is not a valid image.")
+        if not raw or len(raw) > self.MAX_IMAGE_BYTES:
+            raise BadRequest(f"{label} must be smaller than 5 MB.")
+        return value
+
     def _record(self, model, rec_id):
         try:
             rec = request.env[model].browse(int(rec_id))
@@ -186,6 +208,20 @@ class RanchiApiV1(http.Controller):
             'loansOutstanding': self._money(p.loans_outstanding),
             'activeLoanId': p.active_loan_id.id or None,
             'loanCycle': p.loan_cycle,
+            **self._ser_dues(p),
+        }
+
+    def _ser_dues(self, p):
+        """Fees and registration savings the officer still has to collect from member *p*."""
+        dues = p._field_dues()
+        return {
+            'feesDue': self._money(dues['fees_total']),
+            'fees': [{'kind': f['kind'], 'loanId': f['loan'].id if f['loan'] else None,
+                      'loanNumber': f['loan'].name if f['loan'] else None,
+                      'name': f['name'], 'amount': self._money(f['amount']), 'due': self._money(f['due'])}
+                     for f in dues['fees']],
+            'savingsRequired': self._money(dues['savings_required']),
+            'savingsDue': self._money(dues['savings_due']),
         }
 
     def _ser_loan_type(self, lt):
@@ -199,6 +235,12 @@ class RanchiApiV1(http.Controller):
             'minAmount': self._money(lt.min_amount), 'maxAmount': self._money(lt.max_amount),
             'stages': [{'id': s.id, 'name': s.name, 'maxPrincipal': self._money(s.max_principal),
                         'minCycle': s.min_cycle} for s in lt.stage_ids],
+            'registrationFees': [{'id': f.id, 'name': f.name, 'amount': self._money(f.amount)}
+                                 for f in lt.registration_fee_ids],
+            'registrationSavings': self._money(lt.registration_savings),
+            'disbursementFees': [{'id': f.id, 'name': f.name, 'amountType': f.amount_type,
+                                  'amount': self._money(f.amount), 'rate': f.rate}
+                                 for f in lt.disbursement_fee_ids],
         }
 
     def _ser_loan(self, l):
@@ -209,6 +251,7 @@ class RanchiApiV1(http.Controller):
             'stageId': l.stage_id.id or None,
             'amountApplied': self._money(l.amount_applied), 'amountApproved': self._money(l.amount_approved),
             'serviceAmount': self._money(l.service_amount), 'feeTotal': self._money(l.fee_total),
+            'feeResidual': self._money(l.fee_residual),
             'totalRepayable': self._money(l.total_repayable), 'installmentAmount': self._money(l.installment_amount),
             'amountPaid': self._money(l.amount_paid), 'balance': self._money(l.balance),
             'amountOverdue': self._money(l.amount_overdue),
@@ -261,13 +304,16 @@ class RanchiApiV1(http.Controller):
             'id': c.id, 'reference': c.name, 'date': self._date(c.date), 'unionId': c.union_id.id,
             'status': c.state, 'journalId': c.journal_id.id,
             'loanTotal': self._money(c.amount_loan_total), 'savingsTotal': self._money(c.amount_savings_total),
+            'feesTotal': self._money(c.amount_fees_total),
             'total': self._money(c.amount_total),
+            'origin': c.origin,
             'submittedAt': c.submitted_date and c.submitted_date.isoformat() or None,
             'cashReceived': self._money(c.amount_received) if c.received_by_id else None,
             'receivedBy': c.received_by_id.name or None,
             'returnReason': c.return_reason or None,
             'lines': [{'id': ln.id, 'memberId': ln.member_id.id, 'loanId': ln.loan_id.id or None,
-                       'loanAmount': self._money(ln.amount_loan), 'savingsAmount': self._money(ln.amount_savings)}
+                       'loanAmount': self._money(ln.amount_loan), 'savingsAmount': self._money(ln.amount_savings),
+                       'feesAmount': self._money(ln.amount_fees)}
                       for ln in c.line_ids],
         }
 
@@ -409,6 +455,10 @@ class RanchiApiV1(http.Controller):
         nin, bvn = self._identity_number(data, 'nin', 'NIN'), self._identity_number(data, 'bvn', 'BVN')
         if not nin and not bvn:
             raise BadRequest("Enter the member's NIN or BVN.")
+        photo, id_card = self._image(data, 'photo', 'Member photo'), self._image(data, 'idCardPhoto', 'ID card photo')
+        # Older app builds never sent photos; their queued items still sync without one.
+        if data.get('photoRequired') and not photo:
+            raise BadRequest("Take the member's photo.")
 
         def create():
             union = self._record('ranchi.union', data['unionId'])
@@ -422,6 +472,8 @@ class RanchiApiV1(http.Controller):
                 'membership_state': 'applied',
                 'nin': nin,
                 'bvn': bvn,
+                'image_1920': photo,
+                'id_card_image': id_card,
                 'street': data.get('address'),
                 'landmark': data.get('landmark'),
                 'building_type': normalize_building_type(data.get('buildingType')),
@@ -439,9 +491,47 @@ class RanchiApiV1(http.Controller):
             # Internal users can only read contacts; the officer's right to enrol into this union
             # was checked by _record(), so the partner itself is created as superuser.
             partner = request.env['res.partner'].sudo().with_company(union.company_id).create(vals)
-            return self._ser_member(partner.with_env(request.env))
+            partner = partner.with_env(request.env)
+            collection = self._registration_collection(union, partner, data.get('collect'))
+            result = self._ser_member(partner)
+            result['collection'] = self._ser_collection(collection) if collection else None
+            return result
 
         return self._run(lambda: self._idempotent(data, 'members/create', create))
+
+    def _registration_collection(self, union, partner, collect):
+        """Registration fees and opening savings taken by the officer when enrolling the member:
+        a one-line collection submitted for cash handover with the rest of the day's cash.
+        *collect* = {feesAmount?, savingsAmount?, journalId?, date?}."""
+        if not collect:
+            return None
+        try:
+            fees = float(collect.get('feesAmount') or 0.0)
+            savings = float(collect.get('savingsAmount') or 0.0)
+        except (TypeError, ValueError):
+            raise BadRequest("feesAmount and savingsAmount must be numbers")
+        if fees <= 0 and savings <= 0:
+            return None
+        journal_id = int(collect['journalId']) if collect.get('journalId') else \
+            union.company_id.ranchi_collection_journal_id.id
+        if not journal_id:
+            raise BadRequest("No journal given and no default collection journal configured")
+        collection = request.env['ranchi.collection'].create({
+            'union_id': union.id,
+            'company_id': union.company_id.id,
+            'journal_id': journal_id,
+            'date': collect.get('date') or fields.Date.context_today(request.env.user),
+            'note': _("Registration of %s", partner.name),
+            'origin': 'registration',
+            'line_ids': [(0, 0, {
+                'member_id': partner.id,
+                'amount_fees': fees,
+                'amount_savings': savings,
+                'note': _("Registration"),
+            })],
+        })
+        collection.action_submit()
+        return collection
 
     @api_route('/api/v1/members/<int:member_id>/loans')
     def member_loans(self, member_id, **kw):
@@ -598,7 +688,7 @@ class RanchiApiV1(http.Controller):
         """Create a collection and submit it for cash handover.
 
         A manager confirms the cash received and posts it from the backend.
-        Body: {unionId, journalId?, date?, lines: [{memberId, loanId?, loanAmount?, savingsAmount?}],
+        Body: {unionId, journalId?, date?, lines: [{memberId, loanId?, loanAmount?, savingsAmount?, feesAmount?}],
                submit? (default true; false keeps a draft), idempotencyKey?}
         """
         self._authenticate()
@@ -620,6 +710,7 @@ class RanchiApiV1(http.Controller):
                     'loan_id': int(ln['loanId']) if ln.get('loanId') else False,
                     'amount_loan': float(ln.get('loanAmount') or 0.0),
                     'amount_savings': float(ln.get('savingsAmount') or 0.0),
+                    'amount_fees': float(ln.get('feesAmount') or 0.0),
                     'note': ln.get('note'),
                 }))
             collection = request.env['ranchi.collection'].create({
@@ -840,6 +931,7 @@ class RanchiApiV1(http.Controller):
             'collectedToday': self._money(sum(collections_today.mapped('amount_total'))),
             'loanRepaidToday': self._money(sum(collections_today.mapped('amount_loan_total'))),
             'savingsCollectedToday': self._money(sum(collections_today.mapped('amount_savings_total'))),
+            'feesCollectedToday': self._money(sum(collections_today.mapped('amount_fees_total'))),
             'awaitingHandover': len(awaiting),
             'awaitingHandoverAmount': self._money(sum(awaiting.mapped('amount_total'))),
             'pendingWithdrawals': request.env['ranchi.withdrawal.request'].search_count(
