@@ -199,9 +199,9 @@ class RanchiApiV1(http.Controller):
 
     def _ser_member(self, p):
         return {
-            'id': p.id, 'memberNumber': p.member_number, 'name': p.name,
-            'contactNumber': p.phone or p.mobile, 'email': p.email,
-            'status': p.membership_state, 'joinDate': self._date(p.membership_date),
+            'id': p.id, 'memberNumber': p.member_number or None, 'name': p.name,
+            'contactNumber': p.phone or p.mobile or None, 'email': p.email or None,
+            'status': p.membership_state or None, 'joinDate': self._date(p.membership_date),
             'unionId': p.union_id.id or None, 'unionName': p.union_id.name or None,
             'savingsBalance': self._money(p.savings_balance),
             'savingsAvailable': self._money(p.savings_available),
