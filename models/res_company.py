@@ -69,7 +69,7 @@ class ResCompany(models.Model):
     ranchi_early_application_installments = fields.Integer(
         string="Early Application Window", default=3,
         help="With one active loan per member, a member may apply for the next loan while the current "
-             "disbursed loan has fewer than this many installments left unpaid. The new loan is only "
+             "disbursed loan has this many installments or fewer left unpaid. The new loan is only "
              "disbursed once the current one is fully paid. 0 disables early applications.")
 
     # ---- savings ---------------------------------------------------------

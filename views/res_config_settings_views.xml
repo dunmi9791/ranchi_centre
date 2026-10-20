@@ -16,7 +16,7 @@
                             <field name="ranchi_one_active_loan"/>
                         </setting>
                         <setting string="Early application window" invisible="not ranchi_one_active_loan"
-                                 help="Let a member apply for the next loan when the current loan has fewer than this many installments left. The new loan is disbursed only after the current one is fully paid. 0 turns it off.">
+                                 help="Let a member apply for the next loan when the current loan has this many installments or fewer left. The new loan is disbursed only after the current one is fully paid. 0 turns it off.">
                             <field name="ranchi_early_application_installments"/>
                         </setting>
                     </block>

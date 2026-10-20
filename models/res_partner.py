@@ -169,8 +169,8 @@ class ResPartner(models.Model):
         """Return why *self* cannot open another loan application now, or False.
 
         With one active loan per member, the only open loan allowed beside a new
-        application is a disbursed one with fewer unpaid installments than the
-        company's early application window. That loan must be fully paid before
+        application is a disbursed one with at most the company's early application
+        window of unpaid installments left. That loan must be fully paid before
         the new one is disbursed (see ``ranchi.loan._check_previous_loan_paid``).
         """
         self.ensure_one()
@@ -184,11 +184,11 @@ class ResPartner(models.Model):
         window = company.ranchi_early_application_installments
         if window > 0 and len(others) == 1 and others.state == 'disbursed':
             left = len(others.installment_ids.filtered(lambda i: i.state != 'paid'))
-            if left < window:
+            if left <= window:
                 return False
             return _(
                 "%(member)s still has %(left)s installment(s) to pay on loan %(loan)s; "
-                "a new application is allowed from fewer than %(window)s.",
+                "a new application is allowed from %(window)s or fewer.",
                 member=self.display_name, left=left, loan=others.name, window=window)
         return _("%s already has an active loan.", self.display_name)
 

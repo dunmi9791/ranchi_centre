@@ -34,10 +34,9 @@ class TestEarlyApplication(RanchiCommon):
                     'journal_id': self.bank_journal.id})._create_payments()
         self.assertEqual(loan.state, 'fees')
 
-    def test_blocked_with_three_or_more_installments_left(self):
+    def test_blocked_with_more_than_three_installments_left(self):
         self.company.ranchi_early_application_installments = 3
-        loan = self._disbursed_loan()  # 4 installments
-        self._repay_installments(loan, 1)  # 3 left
+        loan = self._disbursed_loan()  # 4 installments, none paid
         self.assertFalse(self.member.can_apply_loan)
         with self.assertRaises(UserError):
             self._new_loan().action_apply()
@@ -45,7 +44,7 @@ class TestEarlyApplication(RanchiCommon):
     def test_apply_early_but_disburse_only_when_paid(self):
         self.company.ranchi_early_application_installments = 3
         loan = self._disbursed_loan()
-        self._repay_installments(loan, 2)  # 2 left
+        self._repay_installments(loan, 1)  # 3 left: still allowed
         self.assertTrue(self.member.can_apply_loan)
 
         new = self._new_loan()
