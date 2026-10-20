@@ -42,6 +42,8 @@ class ResConfigSettings(models.TransientModel):
     ranchi_service_charge_product_id = fields.Many2one(
         related='company_id.ranchi_service_charge_product_id', readonly=False)
     ranchi_one_active_loan = fields.Boolean(related='company_id.ranchi_one_active_loan', readonly=False)
+    ranchi_early_application_installments = fields.Integer(
+        related='company_id.ranchi_early_application_installments', readonly=False)
 
     ranchi_savings_min_balance = fields.Monetary(
         related='company_id.ranchi_savings_min_balance', readonly=False, currency_field='currency_id')

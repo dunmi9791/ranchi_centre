@@ -66,6 +66,11 @@ class ResCompany(models.Model):
         'product.product', string="Service Charge Product", check_company=True)
     ranchi_one_active_loan = fields.Boolean(
         string="One active loan per member", default=True)
+    ranchi_early_application_installments = fields.Integer(
+        string="Early Application Window", default=3,
+        help="With one active loan per member, a member may apply for the next loan while the current "
+             "disbursed loan has fewer than this many installments left unpaid. The new loan is only "
+             "disbursed once the current one is fully paid. 0 disables early applications.")
 
     # ---- savings ---------------------------------------------------------
     ranchi_savings_min_balance = fields.Monetary(

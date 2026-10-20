@@ -96,6 +96,9 @@ class ResPartner(models.Model):
         help="Number of loans this member has fully repaid. Drives loan stage eligibility.")
     loans_outstanding = fields.Monetary(
         compute='_compute_loan_stats', currency_field='currency_id')
+    can_apply_loan = fields.Boolean(
+        compute='_compute_can_apply_loan', string="Can Apply for a Loan",
+        help="No other open loan blocks a new application (see the early application window in settings).")
 
     # ------------------------------------------------------------------
     # Computes
@@ -152,9 +155,48 @@ class ResPartner(models.Model):
             loans = partner.loan_ids
             partner.loan_count = len(loans)
             active = loans.filtered(lambda l: l.state in ('applied', 'approved', 'fees', 'disbursed'))
-            partner.active_loan_id = active[:1]
+            # Prefer the running loan: an early application for the next loan must not hide it.
+            partner.active_loan_id = active.filtered(lambda l: l.state == 'disbursed')[:1] or active[:1]
             partner.loan_cycle = len(loans.filtered(lambda l: l.state == 'paid'))
             partner.loans_outstanding = sum(active.mapped('balance'))
+
+    @api.depends('loan_ids.state', 'loan_ids.installment_ids.state')
+    def _compute_can_apply_loan(self):
+        for partner in self:
+            partner.can_apply_loan = not partner._loan_application_block()
+
+    def _loan_application_block(self, exclude=None):
+        """Return why *self* cannot open another loan application now, or False.
+
+        With one active loan per member, the only open loan allowed beside a new
+        application is a disbursed one with fewer unpaid installments than the
+        company's early application window. That loan must be fully paid before
+        the new one is disbursed (see ``ranchi.loan._check_previous_loan_paid``).
+        """
+        self.ensure_one()
+        company = self.company_id or self.env.company
+        if not company.ranchi_one_active_loan:
+            return False
+        others = self.sudo().loan_ids.filtered(
+            lambda l: l.state in ('applied', 'approved', 'fees', 'disbursed') and l.id not in (exclude or l.browse()).ids)
+        if not others:
+            return False
+        window = company.ranchi_early_application_installments
+        if window > 0 and len(others) == 1 and others.state == 'disbursed':
+            left = len(others.installment_ids.filtered(lambda i: i.state != 'paid'))
+            if left < window:
+                return False
+            return _(
+                "%(member)s still has %(left)s installment(s) to pay on loan %(loan)s; "
+                "a new application is allowed from fewer than %(window)s.",
+                member=self.display_name, left=left, loan=others.name, window=window)
+        return _("%s already has an active loan.", self.display_name)
+
+    def _early_application_loan(self, exclude=None):
+        """The disbursed, not yet paid loan a new application of *self* runs beside, if any."""
+        self.ensure_one()
+        return self.sudo().loan_ids.filtered(
+            lambda l: l.state == 'disbursed' and l.id not in (exclude or l.browse()).ids)[:1].sudo(False)
 
     # ------------------------------------------------------------------
     # Constraints

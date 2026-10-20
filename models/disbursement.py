@@ -81,6 +81,7 @@ class RanchiDisbursement(models.Model):
                 raise UserError(_("Only pending or failed disbursements can be sent."))
             if rec.loan_id.state != 'fees':
                 raise UserError(_("Loan %s is not ready for disbursement.", rec.loan_id.name))
+            rec.loan_id._check_previous_loan_paid()
             if rec.provider != 'manual' and (not rec.account_number or not rec.bank_code):
                 raise UserError(_("A beneficiary account number and bank code are required for %s.", rec.provider))
             rec.write({'state': 'processing', 'date_sent': fields.Datetime.now(), 'error_message': False})
@@ -100,6 +101,8 @@ class RanchiDisbursement(models.Model):
                 raise UserError(_("Only pending or processing disbursements can be marked as paid out."))
             if rec.provider != 'manual' and not self.env.user.has_group('ranchi_centre.group_ranchi_manager'):
                 raise UserError(_("Only a branch manager may override a gateway disbursement."))
+            if rec.provider == 'manual':
+                rec.loan_id._check_previous_loan_paid()
             rec._process_success()
 
     def action_mark_failed(self):

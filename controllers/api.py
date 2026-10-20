@@ -207,6 +207,7 @@ class RanchiApiV1(http.Controller):
             'savingsAvailable': self._money(p.savings_available),
             'loansOutstanding': self._money(p.loans_outstanding),
             'activeLoanId': p.active_loan_id.id or None,
+            'canApplyLoan': p.can_apply_loan,
             'loanCycle': p.loan_cycle,
             **self._ser_dues(p),
         }
@@ -259,6 +260,7 @@ class RanchiApiV1(http.Controller):
             'firstDueDate': self._date(l.date_first_due), 'nextDueDate': self._date(l.next_due_date),
             'totalInstallments': len(l.installment_ids), 'paidInstallments': l.installments_paid_count,
             'overdueInstallments': l.overdue_count,
+            'previousLoanId': l.previous_loan_id.id or None,
         }
 
     def _ser_installment(self, i):

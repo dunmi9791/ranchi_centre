@@ -92,6 +92,9 @@ class RanchiLoan(models.Model):
     disbursement_move_id = fields.Many2one('account.move', string="Disbursement Entry", readonly=True, copy=False)
     writeoff_move_id = fields.Many2one('account.move', string="Write-off Entry", readonly=True, copy=False)
     writeoff_reason = fields.Text(readonly=True, copy=False)
+    previous_loan_id = fields.Many2one(
+        'ranchi.loan', compute='_compute_previous_loan_id', string="Previous Loan Still Running",
+        help="Early application: this loan can only be disbursed once that loan is fully paid.")
 
     # ---- application questionnaire ---------------------------------------
     purpose = fields.Text(string="Purpose of Loan")
@@ -214,6 +217,14 @@ class RanchiLoan(models.Model):
                 loan.balance = loan.total_repayable if loan.state in ACTIVE_STATES else 0.0
                 loan.amount_paid = 0.0
 
+    @api.depends('member_id.loan_ids.state', 'state')
+    def _compute_previous_loan_id(self):
+        for loan in self:
+            if loan.member_id and loan.state in ('draft', 'applied', 'approved', 'fees'):
+                loan.previous_loan_id = loan.member_id._early_application_loan(exclude=loan)
+            else:
+                loan.previous_loan_id = False
+
     @api.depends('installment_ids.state', 'installment_ids.date_due', 'installment_ids.amount_residual')
     def _compute_overdue(self):
         today = fields.Date.context_today(self)
@@ -280,11 +291,9 @@ class RanchiLoan(models.Model):
             raise UserError(_(
                 "%(union)s runs %(type)s only.", union=member.union_id.name,
                 type=member.union_id.loan_type_id.name))
-        if self.company_id.ranchi_one_active_loan:
-            others = self.search_count([
-                ('member_id', '=', member.id), ('id', '!=', self.id), ('state', 'in', ACTIVE_STATES)])
-            if others:
-                raise UserError(_("%s already has an active loan.", member.display_name))
+        block = member._loan_application_block(exclude=self)
+        if block:
+            raise UserError(block)
         lt = self.loan_type_id
         if lt.min_amount and amount < lt.min_amount:
             raise UserError(_("The amount is below the minimum for %s.", lt.name))
@@ -292,10 +301,12 @@ class RanchiLoan(models.Model):
             raise UserError(_("The amount exceeds the maximum for %s.", lt.name))
         stage = self.stage_id
         if stage:
-            if member.loan_cycle < stage.min_cycle:
+            # An early application counts the running loan as repaid: it must be paid before disbursement.
+            cycle = member.loan_cycle + (1 if self.previous_loan_id else 0)
+            if cycle < stage.min_cycle:
                 raise UserError(_(
                     "%(member)s has repaid %(done)s loan(s); stage %(stage)s requires %(need)s.",
-                    member=member.display_name, done=member.loan_cycle, stage=stage.name, need=stage.min_cycle))
+                    member=member.display_name, done=cycle, stage=stage.name, need=stage.min_cycle))
             if amount > stage.max_principal:
                 raise UserError(_("The amount exceeds the ceiling of stage %s.", stage.name))
 
@@ -494,6 +505,7 @@ class RanchiLoan(models.Model):
         self.ensure_one()
         if self.state != 'fees':
             raise UserError(_("The loan must have its fees paid before disbursement."))
+        self._check_previous_loan_paid()
         if self.disbursement_id and self.disbursement_id.state not in ('cancelled', 'failed'):
             return self.disbursement_id._action_open()
         company = self.company_id
@@ -511,6 +523,16 @@ class RanchiLoan(models.Model):
         })
         self.disbursement_id = disbursement
         return disbursement._action_open()
+
+    def _check_previous_loan_paid(self):
+        """An early application is only disbursed once the member's running loan is fully paid."""
+        for loan in self:
+            previous = loan.member_id._early_application_loan(exclude=loan)
+            if previous and loan.company_id.ranchi_one_active_loan:
+                raise UserError(_(
+                    "%(member)s must fully pay loan %(previous)s (balance %(balance)s) before %(loan)s is disbursed.",
+                    member=loan.member_id.display_name, previous=previous.name, loan=loan.name,
+                    balance=previous.balance))
 
     def _on_disbursed(self, disbursement):
         """Book the loan: Dr Loans Receivable per installment / Cr Bank (principal) / Cr Service Income."""

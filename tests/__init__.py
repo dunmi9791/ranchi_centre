@@ -10,3 +10,4 @@ from . import test_product_managers
 from . import test_holidays
 from . import test_savings_adjustment
 from . import test_fees
+from . import test_early_application
