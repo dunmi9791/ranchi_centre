@@ -14,11 +14,12 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
 * Field collections posting loan repayments and savings deposits in one journal entry
 * Withdrawal requests with one or two approval levels, lapse adjustments, write-offs
 * JSON API v1 for the credit officer app, member portal, savings statement report
+* Portfolio analysis and PDF reports: credit officer portfolio, portfolio at risk by branch, officer and union
     """,
     'author': 'Ranchi Empowerment Centre',
     'website': 'https://ranchi.example.com',
     'category': 'Accounting/Microfinance',
-    'version': '18.0.1.3.0',
+    'version': '18.0.1.4.0',
     'license': 'LGPL-3',
     'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web'],
     'data': [
@@ -52,6 +53,8 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'wizards/loan_writeoff_wizard_views.xml',
         'wizards/savings_statement_wizard_views.xml',
         'report/savings_statement_report.xml',
+        'report/portfolio_report.xml',
+        'views/portfolio_report_views.xml',
         'views/portal_templates.xml',
         'views/menus.xml',
     ],

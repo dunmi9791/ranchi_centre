@@ -145,6 +145,39 @@
                         </t>
                     </div>
 
+                    <!-- ============ collections by loan type ============ -->
+                    <div class="o_ranchi_card">
+                        <div class="o_ranchi_card_title o_ranchi_link" t-on-click="() => this.open('collections_to_approve')">
+                            Collections to approve by loan type
+                        </div>
+                        <div t-if="!d.collections.by_loan_type.length" class="text-muted small">Nothing waiting for approval.</div>
+                        <table t-else="" class="table table-sm mb-0">
+                            <thead>
+                                <tr class="text-muted small">
+                                    <th>Loan type</th>
+                                    <th class="text-end">Draft</th>
+                                    <th class="text-end">Submitted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="d.collections.by_loan_type" t-as="row" t-key="row.id">
+                                    <td class="o_ranchi_link" t-on-click="() => this.openCollections(row.id)">
+                                        <t t-esc="row.name"/>
+                                    </td>
+                                    <td class="text-end o_ranchi_link" t-on-click="() => this.openCollections(row.id, 'draft')">
+                                        <t t-esc="int(row.draft)"/>
+                                        <span class="text-muted small"> · <t t-esc="money(row.draft_amount, true)"/></span>
+                                    </td>
+                                    <td class="text-end o_ranchi_link" t-on-click="() => this.openCollections(row.id, 'submitted')">
+                                        <span t-att-class="row.submitted ? 'badge rounded-pill text-bg-warning' : ''">
+                                            <t t-esc="int(row.submitted)"/> · <t t-esc="money(row.submitted_amount, true)"/>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
                     <!-- ============ chart ============ -->
                     <div class="o_ranchi_card o_ranchi_card_wide">
                         <div class="o_ranchi_card_title">Last six months</div>

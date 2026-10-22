@@ -61,6 +61,14 @@ export class RanchiDashboard extends Component {
         this.action.doAction(action);
     }
 
+    async openCollections(loanTypeId, state = null) {
+        const action = await this.orm.call("ranchi.dashboard", "open_action", ["collections_to_approve"], {
+            loan_type_id: loanTypeId,
+            state,
+        });
+        this.action.doAction(action);
+    }
+
     openUnion(id) {
         this.action.doAction({
             type: "ir.actions.act_window",

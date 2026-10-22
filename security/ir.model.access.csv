@@ -66,3 +66,7 @@ access_wiz_withdrawal_pay,ranchi.withdrawal.pay.wizard,model_ranchi_withdrawal_p
 access_wiz_interest_generate,ranchi.interest.generate.wizard,model_ranchi_interest_generate_wizard,group_ranchi_accountant,1,1,1,1
 access_wiz_loan_writeoff,ranchi.loan.writeoff.wizard,model_ranchi_loan_writeoff_wizard,group_ranchi_manager,1,1,1,1
 access_wiz_savings_statement,ranchi.savings.statement.wizard,model_ranchi_savings_statement_wizard,group_ranchi_officer,1,1,1,1
+access_portfolio_report_officer,ranchi.portfolio.report officer,model_ranchi_portfolio_report,group_ranchi_officer,1,0,0,0
+access_portfolio_report_auditor,ranchi.portfolio.report auditor,model_ranchi_portfolio_report,group_ranchi_auditor,1,0,0,0
+access_wiz_portfolio_report_officer,ranchi.portfolio.report.wizard officer,model_ranchi_portfolio_report_wizard,group_ranchi_officer,1,1,1,1
+access_wiz_portfolio_report_auditor,ranchi.portfolio.report.wizard auditor,model_ranchi_portfolio_report_wizard,group_ranchi_auditor,1,1,1,1

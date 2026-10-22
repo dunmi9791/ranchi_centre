@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_portfolio_report_list" model="ir.ui.view">
+        <field name="name">ranchi.portfolio.report.list</field>
+        <field name="model">ranchi.portfolio.report</field>
+        <field name="arch" type="xml">
+            <list string="Portfolio Analysis" create="0" edit="0" delete="0"
+                  decoration-danger="days_in_arrears &gt; 30" decoration-warning="days_in_arrears &gt; 0 and days_in_arrears &lt;= 30"
+                  decoration-muted="state != 'disbursed'">
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+                <field name="credit_officer_id" optional="show"/>
+                <field name="union_id"/>
+                <field name="loan_type_id" optional="hide"/>
+                <field name="loan_id"/>
+                <field name="member_id"/>
+                <field name="date_disbursed" optional="show"/>
+                <field name="state" widget="badge" optional="show"
+                       decoration-info="state == 'disbursed'" decoration-success="state == 'paid'" decoration-danger="state == 'written_off'"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="amount_disbursed" sum="Total"/>
+                <field name="amount_repaid" sum="Total" optional="show"/>
+                <field name="balance" sum="Total"/>
+                <field name="amount_overdue" sum="Total"/>
+                <field name="overdue_count" optional="hide"/>
+                <field name="days_in_arrears"/>
+                <field name="par_bucket" optional="show"/>
+                <field name="amount_written_off" sum="Total" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ranchi_portfolio_report_pivot" model="ir.ui.view">
+        <field name="name">ranchi.portfolio.report.pivot</field>
+        <field name="model">ranchi.portfolio.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Portfolio Analysis" sample="1">
+                <field name="company_id" type="row"/>
+                <field name="credit_officer_id" type="row"/>
+                <field name="active_count" type="measure"/>
+                <field name="balance" type="measure"/>
+                <field name="amount_overdue" type="measure"/>
+                <field name="arrears_count" type="measure"/>
+                <field name="par1_balance" type="measure"/>
+                <field name="par30_balance" type="measure"/>
+                <field name="written_off_count" type="measure"/>
+                <field name="amount_written_off" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_ranchi_portfolio_report_graph" model="ir.ui.view">
+        <field name="name">ranchi.portfolio.report.graph</field>
+        <field name="model">ranchi.portfolio.report</field>
+        <field name="arch" type="xml">
+            <graph string="Portfolio Analysis" type="bar" stacked="1" sample="1">
+                <field name="credit_officer_id"/>
+                <field name="par_bucket"/>
+                <field name="balance" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_ranchi_portfolio_report_search" model="ir.ui.view">
+        <field name="name">ranchi.portfolio.report.search</field>
+        <field name="model">ranchi.portfolio.report</field>
+        <field name="arch" type="xml">
+            <search string="Portfolio Analysis">
+                <field name="credit_officer_id"/>
+                <field name="union_id"/>
+                <field name="member_id"/>
+                <field name="loan_id"/>
+                <field name="loan_type_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <filter name="active" string="Active Loans" domain="[('state', '=', 'disbursed')]"/>
+                <filter name="arrears" string="In Arrears" domain="[('days_in_arrears', '&gt;', 0)]"/>
+                <filter name="par30" string="Over 30 Days in Arrears" domain="[('days_in_arrears', '&gt;', 30)]"/>
+                <filter name="par90" string="Over 90 Days in Arrears" domain="[('days_in_arrears', '&gt;', 90)]"/>
+                <filter name="written_off" string="Written Off" domain="[('state', '=', 'written_off')]"/>
+                <filter name="paid" string="Fully Paid" domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="date_disbursed" string="Disbursed On" date="date_disbursed"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_company" string="Branch" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_officer" string="Credit Officer" context="{'group_by': 'credit_officer_id'}"/>
+                    <filter name="group_union" string="Union" context="{'group_by': 'union_id'}"/>
+                    <filter name="group_loan_type" string="Loan Type" context="{'group_by': 'loan_type_id'}"/>
+                    <filter name="group_bucket" string="Arrears Bucket" context="{'group_by': 'par_bucket'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_disbursed" string="Disbursement Month" context="{'group_by': 'date_disbursed:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ranchi_portfolio_report" model="ir.actions.act_window">
+        <field name="name">Portfolio Analysis</field>
+        <field name="res_model">ranchi.portfolio.report</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_ranchi_portfolio_report_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No disbursed loans yet</p>
+            <p>Loans, arrears and portfolio at risk by branch, credit officer and union, as of today.
+               PAR is the outstanding balance of loans with an installment unpaid past its due date and grace days.</p>
+        </field>
+    </record>
+
+    <!-- ===================== Print wizard ===================== -->
+    <record id="view_ranchi_portfolio_report_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.portfolio.report.wizard.form</field>
+        <field name="model">ranchi.portfolio.report.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="report_type" widget="radio"/>
+                    <field name="company_ids" widget="many2many_tags" options="{'no_create': True}"
+                           groups="base.group_multi_company"/>
+                    <field name="credit_officer_ids" widget="many2many_tags" options="{'no_create': True}"
+                           domain="[('company_id', 'in', company_ids)]"/>
+                    <field name="loan_type_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    <field name="include_loans" invisible="report_type != 'officer'"/>
+                </group>
+                <p class="text-muted">
+                    Figures are as of today. A loan is in arrears once an installment is unpaid past its due date
+                    and the loan type's grace days; PAR is the outstanding balance of those loans.
+                </p>
+                <footer>
+                    <button name="action_print" type="object" string="Print" class="btn-primary"/>
+                    <button name="action_open_analysis" type="object" string="Analyse" class="btn-secondary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_officer_portfolio_wizard" model="ir.actions.act_window">
+        <field name="name">Credit Officer Portfolio</field>
+        <field name="res_model">ranchi.portfolio.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'officer'}</field>
+    </record>
+
+    <record id="action_ranchi_portfolio_risk_wizard" model="ir.actions.act_window">
+        <field name="name">Portfolio at Risk</field>
+        <field name="res_model">ranchi.portfolio.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'risk'}</field>
+    </record>
+</odoo>

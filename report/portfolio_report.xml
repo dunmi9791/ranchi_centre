@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_ranchi_portfolio" model="report.paperformat">
+        <field name="name">Ranchi Portfolio (A4 landscape)</field>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">30</field>
+        <field name="margin_bottom">20</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_spacing">22</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_officer_portfolio" model="ir.actions.report">
+        <field name="name">Credit Officer Portfolio</field>
+        <field name="model">ranchi.portfolio.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ranchi_centre.report_officer_portfolio</field>
+        <field name="report_file">ranchi_centre.report_officer_portfolio</field>
+        <field name="print_report_name">'Credit Officer Portfolio - %s' % (time.strftime('%Y-%m-%d'))</field>
+        <field name="paperformat_id" ref="paperformat_ranchi_portfolio"/>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <record id="action_report_portfolio_risk" model="ir.actions.report">
+        <field name="name">Portfolio at Risk</field>
+        <field name="model">ranchi.portfolio.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ranchi_centre.report_portfolio_risk</field>
+        <field name="report_file">ranchi_centre.report_portfolio_risk</field>
+        <field name="print_report_name">'Portfolio at Risk - %s' % (time.strftime('%Y-%m-%d'))</field>
+        <field name="paperformat_id" ref="paperformat_ranchi_portfolio"/>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- Header cells and one row of figures, shared by every summary table.
+         Expects ``totals`` and, for the row, ``label``. -->
+    <template id="portfolio_totals_head">
+        <th class="text-end">Unions</th>
+        <th class="text-end">Members</th>
+        <th class="text-end">Active Loans</th>
+        <th class="text-end">Principal</th>
+        <th class="text-end">Outstanding</th>
+        <th class="text-end">Arrears</th>
+        <th class="text-end">Loans in Arrears</th>
+        <th class="text-end">PAR &gt; 0</th>
+        <th class="text-end">PAR &gt; 30</th>
+        <th class="text-end">PAR &gt; 90</th>
+        <th class="text-end">Written Off</th>
+    </template>
+
+    <template id="portfolio_totals_cells">
+        <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': currency}"/>
+        <td class="text-end"><t t-out="totals['unions']"/></td>
+        <td class="text-end"><t t-out="totals['members']"/></td>
+        <td class="text-end"><t t-out="totals['active_loans']"/></td>
+        <td class="text-end"><t t-out="totals['principal']" t-options="money"/></td>
+        <td class="text-end"><t t-out="totals['balance']" t-options="money"/></td>
+        <td class="text-end"><t t-out="totals['overdue']" t-options="money"/></td>
+        <td class="text-end"><t t-out="totals['arrears_loans']"/></td>
+        <td class="text-end">
+            <t t-set="par" t-value="pct(totals['par1'], totals['balance'])"/>
+            <span t-att-class="'text-danger fw-bold' if par &gt; 5 else ''" t-out="'%.1f%%' % par"/>
+        </td>
+        <td class="text-end">
+            <t t-set="par" t-value="pct(totals['par30'], totals['balance'])"/>
+            <span t-att-class="'text-danger fw-bold' if par &gt; 5 else ''" t-out="'%.1f%%' % par"/>
+        </td>
+        <td class="text-end"><t t-out="'%.1f%%' % pct(totals['par90'], totals['balance'])"/></td>
+        <td class="text-end">
+            <t t-out="totals['written_off']" t-options="money"/>
+            <small t-if="totals['written_off_loans']" class="text-muted">(<t t-out="totals['written_off_loans']"/>)</small>
+        </td>
+    </template>
+
+    <template id="portfolio_report_title">
+        <div class="row mb-2">
+            <div class="col-8">
+                <h3 class="mb-0" t-out="title"/>
+                <div t-if="subtitle" t-out="subtitle"/>
+            </div>
+            <div class="col-4 text-end small">
+                As of <span t-out="today" t-options="{'widget': 'date'}"/><br/>
+                <span t-if="wizard.loan_type_ids">Loan types: <t t-out="', '.join(wizard.loan_type_ids.mapped('name'))"/></span>
+            </div>
+        </div>
+    </template>
+
+    <template id="portfolio_report_notes">
+        <p class="small text-muted mt-3">
+            A loan is in arrears once an installment is unpaid past its due date and the loan type's grace days;
+            days in arrears count from the oldest such installment. PAR &gt; N is the outstanding balance of loans
+            more than N days in arrears, as a share of the total outstanding. Written off is the all-time amount
+            written off on loans of the union.
+        </p>
+    </template>
+
+    <!-- ===================== Credit officer portfolio ===================== -->
+    <template id="report_officer_portfolio">
+        <t t-call="web.html_container">
+            <t t-if="not portfolio['branches']">
+                <t t-call="web.external_layout">
+                    <div class="page"><p>No unions match the selected filters.</p></div>
+                </t>
+            </t>
+            <t t-foreach="portfolio['branches']" t-as="branch">
+                <t t-foreach="branch['officers']" t-as="off">
+                    <t t-call="web.external_layout">
+                        <t t-set="company" t-value="branch['company']"/>
+                        <div class="page">
+                            <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': currency}"/>
+                            <t t-call="ranchi_centre.portfolio_report_title">
+                                <t t-set="title" t-value="'Credit Officer Portfolio: %s' % (off['officer'].name or 'No Credit Officer')"/>
+                                <t t-set="subtitle" t-value="'Branch: %s' % branch['company'].name"/>
+                            </t>
+
+                            <h5 class="mt-2">Unions</h5>
+                            <table class="table table-sm o_main_table small">
+                                <thead>
+                                    <tr>
+                                        <th>Union</th>
+                                        <th>Loan Type</th>
+                                        <th>Union Day</th>
+                                        <t t-call="ranchi_centre.portfolio_totals_head"/>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="off['unions']" t-as="u">
+                                        <td><span t-field="u['union'].name"/> <small class="text-muted" t-field="u['union'].code"/></td>
+                                        <td><span t-field="u['union'].loan_type_id.name"/></td>
+                                        <td><span t-field="u['union'].union_day"/><span t-if="not u['union'].union_day">Daily</span></td>
+                                        <t t-set="totals" t-value="u['totals']"/>
+                                        <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold border-top">
+                                        <td colspan="3">Total</td>
+                                        <t t-set="totals" t-value="off['totals']"/>
+                                        <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            <t t-if="wizard.include_loans">
+                                <t t-foreach="off['unions']" t-as="u">
+                                    <div t-if="u['loans'] or u['written_off_loans']" style="page-break-inside: avoid;">
+                                        <h6 class="mt-3 mb-1">
+                                            <span t-field="u['union'].name"/>:
+                                            <t t-out="len(u['loans'])"/> active loan(s),
+                                            <t t-out="u['totals']['arrears_loans']"/> in arrears
+                                        </h6>
+                                        <table class="table table-sm small">
+                                            <thead>
+                                                <tr>
+                                                    <th>Member</th>
+                                                    <th>Member No.</th>
+                                                    <th>Loan</th>
+                                                    <th>Disbursed</th>
+                                                    <th class="text-end">Principal</th>
+                                                    <th class="text-end">Repayable</th>
+                                                    <th class="text-end">Repaid</th>
+                                                    <th class="text-end">Outstanding</th>
+                                                    <th class="text-end">Arrears</th>
+                                                    <th class="text-end">Inst. Late</th>
+                                                    <th class="text-end">Days Late</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr t-foreach="u['loans']" t-as="row"
+                                                    t-att-class="'text-danger' if row.days_in_arrears &gt; 30 else ('text-warning' if row.days_in_arrears else '')">
+                                                    <td><span t-field="row.member_id.name"/></td>
+                                                    <td><span t-field="row.member_id.member_number"/></td>
+                                                    <td><span t-field="row.loan_id.name"/></td>
+                                                    <td><span t-field="row.date_disbursed"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_disbursed" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_repayable" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_repaid" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.balance" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_overdue" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.overdue_count"/></td>
+                                                    <td class="text-end"><t t-out="row.days_in_arrears"/></td>
+                                                    <td><span t-field="row.par_bucket"/></td>
+                                                </tr>
+                                                <tr t-foreach="u['written_off_loans']" t-as="row" class="text-muted">
+                                                    <td><span t-field="row.member_id.name"/></td>
+                                                    <td><span t-field="row.member_id.member_number"/></td>
+                                                    <td><span t-field="row.loan_id.name"/></td>
+                                                    <td><span t-field="row.date_disbursed"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_disbursed" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_repayable" t-options="money"/></td>
+                                                    <td class="text-end"><t t-out="row.amount_repaid" t-options="money"/></td>
+                                                    <td class="text-end" colspan="4">
+                                                        Written off <t t-out="row.amount_written_off" t-options="money"/>
+                                                        <t t-if="row.date_closed">on <span t-field="row.date_closed"/></t>
+                                                    </td>
+                                                    <td>Written Off</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-call="ranchi_centre.portfolio_report_notes"/>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- ===================== Portfolio at risk by branch, officer and union ===================== -->
+    <template id="report_portfolio_risk">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <t t-call="ranchi_centre.portfolio_report_title">
+                        <t t-set="title" t-value="'Portfolio at Risk'"/>
+                        <t t-set="subtitle" t-value="'Branches: %s' % ', '.join(wizard.company_ids.mapped('name'))"/>
+                    </t>
+                    <p t-if="not portfolio['branches']">No unions match the selected filters.</p>
+
+                    <t t-if="portfolio['branches']">
+                        <h5 class="mt-2">By Branch</h5>
+                        <table class="table table-sm o_main_table small">
+                            <thead>
+                                <tr>
+                                    <th>Branch</th>
+                                    <t t-call="ranchi_centre.portfolio_totals_head"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="portfolio['branches']" t-as="branch">
+                                    <td><span t-out="branch['company'].name"/></td>
+                                    <t t-set="totals" t-value="branch['totals']"/>
+                                    <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                </tr>
+                            </tbody>
+                            <tfoot t-if="len(portfolio['branches']) &gt; 1">
+                                <tr class="fw-bold border-top">
+                                    <td>Total</td>
+                                    <t t-set="totals" t-value="portfolio['totals']"/>
+                                    <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </t>
+
+                    <t t-foreach="portfolio['branches']" t-as="branch">
+                        <h5 class="mt-4">By Credit Officer: <t t-out="branch['company'].name"/></h5>
+                        <table class="table table-sm o_main_table small">
+                            <thead>
+                                <tr>
+                                    <th>Credit Officer</th>
+                                    <t t-call="ranchi_centre.portfolio_totals_head"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="branch['officers']" t-as="off">
+                                    <td><t t-out="off['officer'].name or 'No Credit Officer'"/></td>
+                                    <t t-set="totals" t-value="off['totals']"/>
+                                    <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold border-top">
+                                    <td>Total</td>
+                                    <t t-set="totals" t-value="branch['totals']"/>
+                                    <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <h5 class="mt-4">By Union: <t t-out="branch['company'].name"/></h5>
+                        <table class="table table-sm o_main_table small">
+                            <thead>
+                                <tr>
+                                    <th>Union</th>
+                                    <th>Credit Officer</th>
+                                    <t t-call="ranchi_centre.portfolio_totals_head"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="branch['officers']" t-as="off">
+                                    <tr t-foreach="off['unions']" t-as="u">
+                                        <td><span t-field="u['union'].name"/></td>
+                                        <td><t t-out="off['officer'].name or ''"/></td>
+                                        <t t-set="totals" t-value="u['totals']"/>
+                                        <t t-call="ranchi_centre.portfolio_totals_cells"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                    <t t-call="ranchi_centre.portfolio_report_notes"/>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

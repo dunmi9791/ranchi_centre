@@ -34,6 +34,8 @@ class RanchiDashboard(models.AbstractModel):
         'collections_today': ('ranchi_centre.action_ranchi_collection', 'today', {}),
         'collections_draft': ('ranchi_centre.action_ranchi_collection', [('state', '=', 'draft')], {}),
         'collections_submitted': ('ranchi_centre.action_ranchi_collection', [('state', '=', 'submitted')], {}),
+        'collections_to_approve': ('ranchi_centre.action_ranchi_collection_to_approve',
+                                   [('state', 'in', ('draft', 'submitted'))], {}),
         'disbursements_pending': ('ranchi_centre.action_ranchi_disbursement',
                                   [('state', 'in', ('pending', 'processing'))], {}),
         'disbursements_failed': ('ranchi_centre.action_ranchi_disbursement', [('state', '=', 'failed')], {}),
@@ -188,6 +190,7 @@ class RanchiDashboard(models.AbstractModel):
                 'submitted': len(collections_submitted),
                 'submitted_amount': sum(collections_submitted.mapped('amount_total')),
                 'this_month': collections_month,
+                'by_loan_type': self._collections_by_loan_type(),
             },
             'disbursements': {
                 'pending': len(pending_disbursements),
@@ -197,6 +200,24 @@ class RanchiDashboard(models.AbstractModel):
             'top_overdue_unions': self._top_overdue_unions(),
             'monthly': self._monthly_series(today),
         }
+
+    @api.model
+    def _collections_by_loan_type(self):
+        """Open collections per loan type: drafts the officers still hold and cash submitted
+        for the product's managers to approve."""
+        groups = self.env['ranchi.collection']._read_group(
+            [('state', 'in', ('draft', 'submitted'))], ['loan_type_id', 'state'],
+            ['amount_total:sum', '__count'])
+        rows = {}
+        for loan_type, state, amount, count in groups:
+            row = rows.setdefault(loan_type.id, {
+                'id': loan_type.id or False,
+                'name': loan_type.name if loan_type else _("No loan type"),
+                'draft': 0, 'draft_amount': 0.0, 'submitted': 0, 'submitted_amount': 0.0,
+            })
+            row[state] = count
+            row[f'{state}_amount'] = amount or 0.0
+        return sorted(rows.values(), key=lambda r: (-r['submitted_amount'], r['name']))
 
     @api.model
     def _top_overdue_unions(self, limit=5):
@@ -241,7 +262,9 @@ class RanchiDashboard(models.AbstractModel):
         return out
 
     @api.model
-    def open_action(self, key):
+    def open_action(self, key, loan_type_id=None, state=None):
+        """``loan_type_id`` (False for collections without one) and ``state`` narrow the
+        per-loan-type collection rows further."""
         self._check_access()
         xml_id, domain, context = self._ACTIONS[key]
         action = self.env['ir.actions.act_window']._for_xml_id(xml_id)
@@ -249,6 +272,10 @@ class RanchiDashboard(models.AbstractModel):
             domain = self._meeting_today_domain()
         elif domain == 'today':
             domain = [('date', '=', self._today())]
+        if loan_type_id is not None:
+            domain = domain + [('loan_type_id', '=', loan_type_id or False)]
+        if state:
+            domain = domain + [('state', '=', state)]
         action['domain'] = domain
         action['context'] = dict(context)
         return action

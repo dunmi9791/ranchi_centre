@@ -22,6 +22,8 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 | API | `controllers/api.py` | `/api/v1/...` JSON-RPC, bearer API key, idempotency keys |
 | Portal | `/my/savings`, `/my/loans` | Members see balances, transactions, schedules |
 | Report | Savings statement | Wizard with date range, running balance |
+| Report | Portfolio analysis | `ranchi.portfolio.report` SQL view, one row per disbursed loan: outstanding, arrears, days in arrears, PAR >0/30/90 by branch, credit officer, union (pivot/graph/list) |
+| Report | Credit officer portfolio / Portfolio at risk | PDF wizard: per officer every union with its active loans and write-offs; PAR summary by branch, officer and union |
 
 ## Accounting design
 

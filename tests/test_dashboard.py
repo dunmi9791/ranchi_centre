@@ -61,6 +61,27 @@ class TestDashboard(RanchiCommon):
         action = Dashboard.open_action('loans_active')
         self.assertEqual(action['domain'], [('state', '=', 'disbursed')])
 
+    def test_collections_by_loan_type(self):
+        loan = self._disbursed_loan()
+        Collection = self.env['ranchi.collection']
+        vals = {'union_id': self.union.id, 'company_id': self.company.id, 'journal_id': self.bank_journal.id}
+        draft = Collection.create(dict(vals, line_ids=[(0, 0, {
+            'member_id': self.member.id, 'amount_savings': 200.0})]))
+        submitted = Collection.create(dict(vals, line_ids=[(0, 0, {
+            'member_id': self.member.id, 'loan_id': loan.id, 'amount_loan': loan.installment_amount})]))
+        submitted.action_submit()
+        Dashboard = self.env['ranchi.dashboard']
+        rows = Dashboard.get_data()['collections']['by_loan_type']
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['id'], self.loan_type.id)
+        self.assertEqual((rows[0]['draft'], rows[0]['submitted']), (1, 1))
+        self.assertAlmostEqual(rows[0]['draft_amount'], draft.amount_total)
+        self.assertAlmostEqual(rows[0]['submitted_amount'], submitted.amount_total)
+        action = Dashboard.open_action('collections_to_approve', loan_type_id=self.loan_type.id, state='submitted')
+        self.assertEqual(Collection.search(action['domain']), submitted)
+        action = Dashboard.open_action('collections_to_approve', loan_type_id=self.loan_type.id)
+        self.assertEqual(Collection.search(action['domain']), draft | submitted)
+
     def test_requires_ranchi_group(self):
         user = self.env['res.users'].create({
             'name': 'Nobody', 'login': 'nobody-dash', 'groups_id': [(6, 0, [self.env.ref('base.group_user').id])]})
