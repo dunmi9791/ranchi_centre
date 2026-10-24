@@ -703,25 +703,13 @@ class RanchiApiV1(http.Controller):
                 union.company_id.ranchi_collection_journal_id.id
             if not journal_id:
                 raise BadRequest("No journal given and no default collection journal configured")
-            lines = []
-            for ln in data['lines']:
-                if not ln.get('memberId'):
-                    raise BadRequest("Each line needs a memberId")
-                lines.append((0, 0, {
-                    'member_id': int(ln['memberId']),
-                    'loan_id': int(ln['loanId']) if ln.get('loanId') else False,
-                    'amount_loan': float(ln.get('loanAmount') or 0.0),
-                    'amount_savings': float(ln.get('savingsAmount') or 0.0),
-                    'amount_fees': float(ln.get('feesAmount') or 0.0),
-                    'note': ln.get('note'),
-                }))
             collection = request.env['ranchi.collection'].create({
                 'union_id': union.id,
                 'company_id': union.company_id.id,
                 'journal_id': journal_id,
                 'date': data.get('date') or fields.Date.context_today(request.env.user),
                 'note': data.get('note'),
-                'line_ids': lines,
+                'line_ids': self._collection_lines(data['lines']),
             })
             # 'post' is the field's old name; officers can no longer post, only hand over.
             if data.get('submit', data.get('post', True)):
@@ -729,6 +717,49 @@ class RanchiApiV1(http.Controller):
             return self._ser_collection(collection)
 
         return self._run(lambda: self._idempotent(data, 'collections/create', create))
+
+    @api_route('/api/v1/collections/update')
+    def collection_update(self, **kw):
+        """Correct a collection the manager returned (or a kept draft) and hand it over again.
+
+        Body: {collectionId, lines: [...as in create], journalId?, note?, submit? (default true), idempotencyKey?}
+        The lines replace the collection's current lines.
+        """
+        self._authenticate()
+        data = self._params(kw)
+        self._require(data, 'collectionId', 'lines')
+
+        def update():
+            collection = self._record('ranchi.collection', data['collectionId'])
+            if collection.state != 'draft':
+                raise UserError(_("Only returned or draft collections can be edited."))
+            vals = {'line_ids': [(5, 0, 0)] + self._collection_lines(data['lines'])}
+            if data.get('journalId'):
+                vals['journal_id'] = int(data['journalId'])
+            if 'note' in data:
+                vals['note'] = data['note']
+            collection.write(vals)
+            if data.get('submit', True):
+                collection.action_submit()
+            return self._ser_collection(collection)
+
+        return self._run(lambda: self._idempotent(data, 'collections/update', update))
+
+    @staticmethod
+    def _collection_lines(lines):
+        vals = []
+        for ln in lines:
+            if not ln.get('memberId'):
+                raise BadRequest("Each line needs a memberId")
+            vals.append((0, 0, {
+                'member_id': int(ln['memberId']),
+                'loan_id': int(ln['loanId']) if ln.get('loanId') else False,
+                'amount_loan': float(ln.get('loanAmount') or 0.0),
+                'amount_savings': float(ln.get('savingsAmount') or 0.0),
+                'amount_fees': float(ln.get('feesAmount') or 0.0),
+                'note': ln.get('note'),
+            }))
+        return vals
 
     @api_route('/api/v1/installments/pay')
     def installment_pay(self, **kw):

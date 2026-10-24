@@ -110,6 +110,42 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         self.assertEqual(again['id'], result['id'])
         self.assertEqual(self.env['ranchi.collection'].search_count([('union_id', '=', self.union.id)]), 1)
 
+    def test_officer_fixes_and_resends_returned_collection(self):
+        loan = self._disbursed_loan()
+        key = self._key()
+        line = {'memberId': self.member.id, 'loanId': loan.id, 'loanAmount': loan.installment_amount}
+        result = self._ok('/api/v1/collections/create', {
+            'unionId': self.union.id, 'journalId': self.bank_journal.id,
+            'lines': [{**line, 'savingsAmount': 500.0}]}, key)
+        collection = self.env['ranchi.collection'].browse(result['id'])
+        # a submitted collection is locked
+        self.assertIn('error', self._rpc('/api/v1/collections/update', {
+            'collectionId': collection.id, 'lines': [{**line, 'savingsAmount': 400.0}]}, key=key))
+
+        collection.amount_received = collection.amount_total - 100.0
+        collection.return_reason = 'Short by 100'
+        collection.action_return_to_officer()
+        listed = self._ok('/api/v1/collections', {'unionId': self.union.id}, key)
+        self.assertEqual((listed[0]['status'], listed[0]['returnReason']), ('draft', 'Short by 100'))
+
+        fixed = self._ok('/api/v1/collections/update', {
+            'collectionId': collection.id, 'idempotencyKey': 'fix-1',
+            'lines': [{**line, 'savingsAmount': 400.0}]}, key)
+        self.assertEqual(fixed['id'], collection.id)
+        self.assertEqual(fixed['status'], 'submitted')
+        self.assertIsNone(fixed['returnReason'])
+        self.assertEqual(fixed['savingsTotal'], 400.0)
+        self.assertEqual(len(collection.line_ids), 1)
+        self.assertEqual(self.env['ranchi.collection'].search_count([('union_id', '=', self.union.id)]), 1)
+        # replaying the same key does not touch the now-submitted collection
+        self.assertEqual(self._ok('/api/v1/collections/update', {
+            'collectionId': collection.id, 'idempotencyKey': 'fix-1', 'lines': [line]}, key)['savingsTotal'], 400.0)
+
+        collection.amount_received = collection.amount_total
+        collection.action_confirm_cash()
+        self.assertIn('error', self._rpc('/api/v1/collections/update', {
+            'collectionId': collection.id, 'lines': [line]}, key=key))
+
     def test_officer_pays_single_installment(self):
         loan = self._disbursed_loan()
         inst = loan.installment_ids.sorted('sequence')[0]

@@ -33,6 +33,9 @@
     <menuitem id="menu_ranchi_portfolio_analysis" name="Portfolio Analysis" parent="menu_ranchi_reporting_root" action="action_ranchi_portfolio_report" sequence="1"/>
     <menuitem id="menu_ranchi_officer_portfolio" name="Credit Officer Portfolio" parent="menu_ranchi_reporting_root" action="action_ranchi_officer_portfolio_wizard" sequence="2"/>
     <menuitem id="menu_ranchi_portfolio_risk" name="Portfolio at Risk" parent="menu_ranchi_reporting_root" action="action_ranchi_portfolio_risk_wizard" sequence="3"/>
+    <menuitem id="menu_ranchi_disbursement_roll" name="Disbursement Master Roll" parent="menu_ranchi_reporting_root" action="action_ranchi_disbursement_roll_wizard" sequence="4"/>
+    <menuitem id="menu_ranchi_daily_collection" name="Daily Collection Sheet" parent="menu_ranchi_reporting_root" action="action_ranchi_daily_collection_wizard" sequence="5"/>
+    <menuitem id="menu_ranchi_daily_defaults" name="Defaults of the Day" parent="menu_ranchi_reporting_root" action="action_ranchi_daily_defaults_wizard" sequence="6"/>
     <menuitem id="menu_ranchi_statement" name="Savings Statement" parent="menu_ranchi_reporting_root" action="action_ranchi_savings_statement_wizard" sequence="10"/>
 
     <menuitem id="menu_ranchi_config_root" name="Configuration" parent="menu_ranchi_root" sequence="90" groups="ranchi_centre.group_ranchi_general_manager"/>

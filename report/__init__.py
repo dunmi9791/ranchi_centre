@@ -1,3 +1,4 @@
 # -*- coding: utf-8 -*-
 from . import savings_statement_report
 from . import portfolio_report
+from . import daily_report

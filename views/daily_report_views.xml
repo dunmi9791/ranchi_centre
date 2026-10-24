@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ranchi_daily_report_wizard_form" model="ir.ui.view">
+        <field name="name">ranchi.daily.report.wizard.form</field>
+        <field name="model">ranchi.daily.report.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <group>
+                        <field name="report_type" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                </group>
+                <group>
+                    <field name="company_ids" widget="many2many_tags" options="{'no_create': True}"
+                           groups="base.group_multi_company"/>
+                    <field name="credit_officer_ids" widget="many2many_tags" options="{'no_create': True}"
+                           domain="[('company_id', 'in', company_ids)]"/>
+                    <field name="loan_type_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    <field name="include_details" invisible="report_type != 'collection'"/>
+                </group>
+                <p class="text-muted" invisible="report_type != 'disbursement'">
+                    Every loan disbursed between the two dates, by branch, credit officer and union, with principal,
+                    charges, repayment amount and schedule.
+                </p>
+                <p class="text-muted" invisible="report_type != 'collection'">
+                    For each day and credit officer: what each member was expected to repay that day, the arrears they
+                    carried, and the loan repayment, savings and fees collected. One page per officer per day.
+                </p>
+                <p class="text-muted" invisible="report_type != 'default'">
+                    Members who did not fully pay the installment due on each day, with their shortfall and arrears.
+                </p>
+                <footer>
+                    <button name="action_print" type="object" string="Print" class="btn-primary"/>
+                    <button name="action_open_analysis" type="object" string="Open List" class="btn-secondary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ranchi_disbursement_roll_wizard" model="ir.actions.act_window">
+        <field name="name">Disbursement Master Roll</field>
+        <field name="res_model">ranchi.daily.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'disbursement'}</field>
+    </record>
+
+    <record id="action_ranchi_daily_collection_wizard" model="ir.actions.act_window">
+        <field name="name">Daily Collection Sheet</field>
+        <field name="res_model">ranchi.daily.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'collection'}</field>
+    </record>
+
+    <record id="action_ranchi_daily_defaults_wizard" model="ir.actions.act_window">
+        <field name="name">Defaults of the Day</field>
+        <field name="res_model">ranchi.daily.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'default'}</field>
+    </record>
+</odoo>

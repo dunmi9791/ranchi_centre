@@ -70,3 +70,5 @@ access_portfolio_report_officer,ranchi.portfolio.report officer,model_ranchi_por
 access_portfolio_report_auditor,ranchi.portfolio.report auditor,model_ranchi_portfolio_report,group_ranchi_auditor,1,0,0,0
 access_wiz_portfolio_report_officer,ranchi.portfolio.report.wizard officer,model_ranchi_portfolio_report_wizard,group_ranchi_officer,1,1,1,1
 access_wiz_portfolio_report_auditor,ranchi.portfolio.report.wizard auditor,model_ranchi_portfolio_report_wizard,group_ranchi_auditor,1,1,1,1
+access_wiz_daily_report_officer,ranchi.daily.report.wizard officer,model_ranchi_daily_report_wizard,group_ranchi_officer,1,1,1,1
+access_wiz_daily_report_auditor,ranchi.daily.report.wizard auditor,model_ranchi_daily_report_wizard,group_ranchi_auditor,1,1,1,1
