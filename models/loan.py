@@ -484,17 +484,6 @@ class RanchiLoan(models.Model):
         self.message_post(body=_("Fee invoice %s created.", invoice.name))
         return invoice
 
-    def action_create_fee_invoice(self):
-        self.ensure_one()
-        if self.state != 'approved':
-            raise UserError(_("Fees are invoiced once the loan is approved."))
-        if self.fee_move_id and self.fee_move_id.state != 'cancel':
-            return self._action_open_move(self.fee_move_id)
-        if self.currency_id.is_zero(self.fee_total):
-            self._on_fees_paid()
-            return True
-        return self._action_open_move(self._create_fee_invoice())
-
     def _on_fees_paid(self):
         for loan in self:
             if loan.state == 'approved':

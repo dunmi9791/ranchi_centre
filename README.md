@@ -35,6 +35,10 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
   `amount_residual`, so Fully Paid is reached automatically.
 * **Fees**: customer invoices (membership, admin fee, risk premium, up-front service charge)
   on the configured sales journal. The loan moves to Fees Paid when the invoice is paid.
+  Fee invoices are paid **only through a field collection**: Register Payment, matching an
+  outstanding payment and manual reconciliation are refused on them (a credit note can still
+  reverse one). There is no back-office "Invoice Fees" or "Collect Membership Fee" button; the
+  invoices are created when the first collection carrying the fees is posted.
 * **Field fees**: each loan type lists its registration fees, the savings a new member needs
   before approval, and other fees due before disbursement (fixed or % of the approved amount).
   Credit officers collect them on a collection line (`amount_fees`). Posting the collection
@@ -44,6 +48,11 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
   A member is only confirmed once the loan type's registration fees are paid and the savings
   balance reaches the minimum. Without registration fees on the loan type, the branch
   membership fee applies and does not block confirmation.
+  A loan approved during the day shows up on the officer's open sheet at the next sync. If the
+  day's sheet is already submitted, the officer records the fees with **Collect fees** (member
+  page, or the **Fees to collect** card on Today): a one-line collection for the same day that
+  goes through the same cash handover. The Daily Collection Sheet shows, per member, the fees
+  still due when the day began next to the fees collected.
 * **Savings**: deposit Dr Bank / Cr Savings Liability (partner); withdrawal the reverse;
   interest Dr Interest Expense / Cr Liability; fee Dr Liability / Cr Fee Income. Member
   balances are read from posted lines on the liability account. Holds are non-accounting.

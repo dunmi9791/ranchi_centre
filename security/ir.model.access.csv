@@ -60,7 +60,6 @@ access_lapse_manager,ranchi.lapse.adjustment manager,model_ranchi_lapse_adjustme
 access_lapse_auditor,ranchi.lapse.adjustment auditor,model_ranchi_lapse_adjustment,group_ranchi_auditor,1,0,0,0
 access_api_request_general_manager,ranchi.api.request general manager,model_ranchi_api_request,group_ranchi_general_manager,1,1,1,1
 access_api_request_auditor,ranchi.api.request auditor,model_ranchi_api_request,group_ranchi_auditor,1,0,0,0
-access_wiz_membership_fee,ranchi.membership.fee.wizard,model_ranchi_membership_fee_wizard,group_ranchi_officer,1,1,1,1
 access_wiz_savings_deposit,ranchi.savings.deposit.wizard,model_ranchi_savings_deposit_wizard,group_ranchi_officer,1,1,1,1
 access_wiz_withdrawal_pay,ranchi.withdrawal.pay.wizard,model_ranchi_withdrawal_pay_wizard,group_ranchi_officer,1,1,1,1
 access_wiz_interest_generate,ranchi.interest.generate.wizard,model_ranchi_interest_generate_wizard,group_ranchi_accountant,1,1,1,1

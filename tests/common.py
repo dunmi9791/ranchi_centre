@@ -85,6 +85,15 @@ class RanchiCommon(AccountTestInvoicingCommon):
         collection.action_confirm_cash()
         return collection
 
+    def _collect_fees(self, member, amount):
+        """Fees reach the branch only through a field collection: the officer takes them and the
+        manager confirms the cash."""
+        collection = self.env['ranchi.collection'].create({
+            'union_id': member.union_id.id, 'company_id': self.company.id, 'journal_id': self.bank_journal.id,
+            'line_ids': [(0, 0, {'member_id': member.id, 'amount_fees': amount})],
+        })
+        return self._hand_over(collection)
+
     def _disbursed_loan(self, member=None, amount=10000.0):
         member = member or self.member
         loan = self.env['ranchi.loan'].create({
@@ -93,10 +102,7 @@ class RanchiCommon(AccountTestInvoicingCommon):
         loan.action_apply()
         loan.action_approve()
         if loan.state == 'approved':
-            loan.action_create_fee_invoice()
-            self.env['account.payment.register'].with_context(
-                active_model='account.move', active_ids=loan.fee_move_id.ids).create({
-                    'journal_id': self.bank_journal.id})._create_payments()
+            self._collect_fees(member, loan.fee_residual)
         self.assertEqual(loan.state, 'fees')
         loan.action_request_disbursement()
         loan.disbursement_id.action_send()

@@ -38,8 +38,6 @@
                             invisible="state != 'draft'"/>
                     <button name="action_approve" type="object" string="Approve" class="btn-primary"
                             invisible="state != 'applied'" groups="ranchi_centre.group_ranchi_manager"/>
-                    <button name="action_create_fee_invoice" type="object" string="Invoice Fees" class="btn-primary"
-                            invisible="state != 'approved' or fee_move_id" groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_view_fee_invoice" type="object" string="Fee Invoice"
                             invisible="not fee_move_id"/>
                     <button name="action_request_disbursement" type="object" string="Disburse" class="btn-primary"
@@ -63,6 +61,11 @@
                     Early application: the member is still repaying
                     <field name="previous_loan_id" class="fw-bold" readonly="1"/>.
                     This loan is disbursed only once that loan is fully paid.
+                </div>
+                <div class="alert alert-info mb-0" role="alert" invisible="state != 'approved' or fee_residual &lt;= 0">
+                    Fees of <field name="fee_residual" class="fw-bold" readonly="1"/> are collected by the credit
+                    officer on the union's collection sheet. The loan moves to Fees Paid once the manager confirms
+                    that collection's cash.
                 </div>
                 <sheet>
                     <div class="oe_button_box" name="button_box">

@@ -179,11 +179,84 @@ class RanchiDailyReportWizard(models.TransientModel):
     def _empty_day_totals(self):
         return {
             'members': 0, 'expected': 0.0, 'arrears_bf': 0.0, 'repaid': 0.0, 'from_savings': 0.0,
-            'savings': 0.0, 'fees': 0.0, 'total': 0.0, 'met': 0.0, 'shortfall': 0.0, 'defaulters': 0,
-            'pending': 0.0,
+            'savings': 0.0, 'fees': 0.0, 'fees_due': 0.0, 'total': 0.0, 'met': 0.0, 'shortfall': 0.0,
+            'defaulters': 0, 'pending': 0.0,
         }
 
-    def _day_rows(self, day):
+    def _fee_obligations(self):
+        """Fees the officers had to collect in the period, as
+        [{'member', 'start', 'amount', 'settled': [(date, amount)]}]: registration fees from the day
+        the member was registered, fees before disbursement from the day the loan was approved.
+        'settled' lists what was reconciled with the invoice and when."""
+        self.ensure_one()
+        result = []
+
+        def settled(invoice):
+            if not invoice:
+                return []
+            receivable = invoice.line_ids.filtered(lambda l: l.display_type == 'payment_term')
+            return [(p.max_date, p.amount) for p in receivable.matched_credit_ids]
+
+        loans = self.env['ranchi.loan'].search(self._loan_domain() + [
+            ('date_approval', '<=', self.date_to),
+            '|', ('state', '=', 'approved'),
+            '&', ('state', 'in', ('fees', 'disbursed', 'paid', 'written_off')), ('fee_move_id', '!=', False),
+        ])
+        for loan in loans:
+            invoice = loan.sudo().fee_move_id
+            if invoice.state == 'cancel':
+                invoice = invoice.browse()
+            if not invoice and loan.state != 'approved':
+                continue
+            result.append({
+                'member': loan.member_id, 'start': loan.date_approval,
+                'amount': invoice.amount_total if invoice else loan.fee_total, 'settled': settled(invoice)})
+
+        member_domain = [
+            ('is_ranchi_member', '=', True), ('union_id.company_id', 'in', self.company_ids.ids),
+            '|', ('membership_fee_move_id', '!=', False), ('membership_state', 'in', ('applied', 'vetted')),
+        ]
+        if self.credit_officer_ids:
+            member_domain.append(('union_id.credit_officer_id', 'in', self.credit_officer_ids.ids))
+        if self.loan_type_ids:
+            member_domain.append(('union_id.loan_type_id', 'in', self.loan_type_ids.ids))
+        for member in self.env['res.partner'].search(member_domain):
+            invoice = member.sudo().membership_fee_move_id
+            if invoice.state == 'cancel':
+                invoice = invoice.browse()
+            if invoice and invoice.state == 'posted':
+                amount = invoice.amount_total
+            elif member._in_registration():
+                amount = member.registration_fee_residual
+            else:
+                continue
+            result.append({
+                'member': member, 'start': fields.Date.to_date(member.create_date), 'amount': amount,
+                'settled': settled(invoice if invoice.state == 'posted' else None)})
+        return [o for o in result if o['amount'] > 0]
+
+    @api.model
+    def _fees_due_on(self, day, obligations, pending_lines):
+        """Fees each member still owed when *day* began: member -> amount. *pending_lines* are
+        collection lines handed over but not posted yet, which settle nothing on the invoices."""
+        owed = {}
+        for ob in obligations:
+            if ob['start'] > day:
+                continue
+            left = ob['amount'] - sum(amount for date, amount in ob['settled'] if date < day)
+            if left > 0:
+                owed[ob['member']] = owed.get(ob['member'], 0.0) + left
+        for line in pending_lines:
+            if line.date < day and line.member_id in owed:
+                owed[line.member_id] = max(0.0, owed[line.member_id] - line.amount_fees)
+        return owed
+
+    def _pending_fee_lines(self):
+        return self.env['ranchi.collection.line'].search([
+            ('state', '=', 'submitted'), ('amount_fees', '>', 0), ('date', '<', self.date_to),
+            ('company_id', 'in', self.company_ids.ids)])
+
+    def _day_rows(self, day, fee_obligations=None, pending_fee_lines=None):
         """Member rows for *day*: what was due on the loan and what came in, as the user sees it.
 
         Expected is the part of the installments due that day still unpaid when the day began,
@@ -192,9 +265,14 @@ class RanchiDailyReportWizard(models.TransientModel):
         plus collections submitted but not yet posted by the manager, which have no repayment
         records yet. Repayments go to the oldest installment first, so a payment clears
         arrears before the day's installment; shortfall is what is left unpaid of the day's
-        installment, and a member with a shortfall is a defaulter of the day.
+        installment, and a member with a shortfall is a defaulter of the day. Fees due is what
+        the member still owed in fees when the day began; it is kept out of expected and shortfall.
         """
         self.ensure_one()
+        if fee_obligations is None:
+            fee_obligations = self._fee_obligations()
+        if pending_fee_lines is None:
+            pending_fee_lines = self._pending_fee_lines()
         loans = self.env['ranchi.loan'].search(self._loan_domain() + [
             ('state', 'in', ('disbursed', 'paid', 'written_off')),
             ('date_disbursed', '<=', day),
@@ -258,7 +336,7 @@ class RanchiDailyReportWizard(models.TransientModel):
         for loan in Loan.browse(list(per_loan)):
             vals = per_loan[loan.id]
             rows[(loan.member_id, loan)] = dict(vals, member=loan.member_id, loan=loan, union=loan.union_id,
-                                                company=loan.company_id, savings=0.0, fees=0.0)
+                                                company=loan.company_id, savings=0.0, fees=0.0, fees_due=0.0)
         for line in lines:
             loan = line.loan_id if line.loan_id in loans else Loan
             key = (line.member_id, loan)
@@ -269,12 +347,20 @@ class RanchiDailyReportWizard(models.TransientModel):
                 'expected': 0.0, 'arrears_bf': 0.0, 'paid_due': 0.0, 'paid_arrears': 0.0,
                 'oldest_due': None, 'repaid': 0.0, 'from_savings': 0.0, 'pending': 0.0,
                 'member': line.member_id, 'loan': loan, 'union': line.collection_id.union_id,
-                'company': line.company_id, 'savings': 0.0, 'fees': 0.0})
+                'company': line.company_id, 'savings': 0.0, 'fees': 0.0, 'fees_due': 0.0})
             row['savings'] += line.amount_savings
             row['fees'] += line.amount_fees
             if line.state == 'submitted' and line.amount_loan:
                 row['repaid'] += line.amount_loan
                 row['pending'] += line.amount_loan
+        for member, amount in self._fees_due_on(day, fee_obligations, pending_fee_lines).items():
+            key = next((k for k in rows if k[0] == member), (member, Loan))
+            row = rows.setdefault(key, {
+                'expected': 0.0, 'arrears_bf': 0.0, 'paid_due': 0.0, 'paid_arrears': 0.0,
+                'oldest_due': None, 'repaid': 0.0, 'from_savings': 0.0, 'pending': 0.0,
+                'member': member, 'loan': Loan, 'union': member.union_id,
+                'company': member.union_id.company_id, 'savings': 0.0, 'fees': 0.0, 'fees_due': 0.0})
+            row['fees_due'] += amount
 
         result = []
         for row in rows.values():
@@ -296,7 +382,7 @@ class RanchiDailyReportWizard(models.TransientModel):
                 'phone': row['member'].phone or row['member'].mobile or '',
                 'installment': row['loan'].installment_amount if row['loan'] else 0.0,
             })
-            if currency_zero(row['expected']) and currency_zero(row['total']):
+            if currency_zero(row['expected']) and currency_zero(row['total']) and currency_zero(row['fees_due']):
                 continue
             result.append(row)
         result.sort(key=lambda r: r['member'].name or '')
@@ -307,8 +393,8 @@ class RanchiDailyReportWizard(models.TransientModel):
         for row in rows:
             totals['members'] += 1
             totals['defaulters'] += 1 if row['shortfall'] else 0
-            for key in ('expected', 'arrears_bf', 'repaid', 'from_savings', 'savings', 'fees', 'total',
-                        'met', 'shortfall', 'pending'):
+            for key in ('expected', 'arrears_bf', 'repaid', 'from_savings', 'savings', 'fees', 'fees_due',
+                        'total', 'met', 'shortfall', 'pending'):
                 totals[key] += row[key]
         return totals
 
@@ -317,8 +403,10 @@ class RanchiDailyReportWizard(models.TransientModel):
         self.ensure_one()
         days = []
         summary = {}  # officer -> list of (day, totals)
+        fee_obligations = self._fee_obligations()
+        pending_fee_lines = self._pending_fee_lines()
         for day in self._days():
-            rows = self._day_rows(day)
+            rows = self._day_rows(day, fee_obligations, pending_fee_lines)
             if defaults_only:
                 rows = [r for r in rows if r['shortfall']]
             tree = self._tree(rows, lambda r: r['union'], self._day_totals, self._sum_into)

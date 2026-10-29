@@ -27,11 +27,8 @@ class TestEarlyApplication(RanchiCommon):
             'loan_type_id': self.loan_type.id, 'amount_applied': 5000.0})
 
     def _pay_fees(self, loan):
-        loan.action_create_fee_invoice()
         if loan.state == 'approved':
-            self.env['account.payment.register'].with_context(
-                active_model='account.move', active_ids=loan.fee_move_id.ids).create({
-                    'journal_id': self.bank_journal.id})._create_payments()
+            self._collect_fees(loan.member_id, loan.fee_residual)
         self.assertEqual(loan.state, 'fees')
 
     def test_blocked_with_more_than_three_installments_left(self):

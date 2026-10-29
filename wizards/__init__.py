@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from . import membership_fee_wizard
 from . import savings_deposit_wizard
 from . import withdrawal_pay_wizard
 from . import interest_generate_wizard

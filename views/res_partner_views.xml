@@ -7,8 +7,6 @@
         <field name="arch" type="xml">
             <xpath expr="//sheet" position="before">
                 <header invisible="not is_ranchi_member">
-                    <button name="action_open_membership_fee_wizard" type="object" string="Collect Membership Fee"
-                            class="btn-primary" invisible="membership_state != 'applied' or membership_fee_move_id"/>
                     <button name="action_vet_member" type="object" string="Vet"
                             class="btn-secondary" invisible="membership_state != 'applied'"
                             groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
@@ -22,6 +20,11 @@
                             invisible="membership_state not in ('vetted', 'exited')" groups="ranchi_centre.group_ranchi_manager"/>
                     <field name="membership_state" widget="statusbar" statusbar_visible="applied,vetted,confirmed"/>
                 </header>
+                <div class="alert alert-info mb-0" role="alert"
+                     invisible="not is_ranchi_member or membership_state not in ('applied', 'vetted') or registration_fee_residual &lt;= 0">
+                    Registration fees of <field name="registration_fee_residual" class="fw-bold" readonly="1"/> are
+                    collected by the credit officer on the union's collection sheet.
+                </div>
             </xpath>
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button name="action_view_loans" type="object" class="oe_stat_button" icon="fa-money"

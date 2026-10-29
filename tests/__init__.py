@@ -13,3 +13,4 @@ from . import test_fees
 from . import test_early_application
 from . import test_portfolio_report
 from . import test_daily_report
+from . import test_fees_collection_only

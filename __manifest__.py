@@ -20,7 +20,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
     'author': 'Ranchi Empowerment Centre',
     'website': 'https://ranchi.example.com',
     'category': 'Accounting/Microfinance',
-    'version': '18.0.1.5.0',
+    'version': '18.0.1.6.0',
     'license': 'LGPL-3',
     'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web'],
     'data': [
@@ -47,7 +47,6 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'views/gateway_event_views.xml',
         'views/api_request_views.xml',
         'views/account_move_views.xml',
-        'wizards/membership_fee_wizard_views.xml',
         'wizards/savings_deposit_wizard_views.xml',
         'wizards/withdrawal_pay_wizard_views.xml',
         'wizards/interest_generate_wizard_views.xml',

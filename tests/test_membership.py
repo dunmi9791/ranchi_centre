@@ -27,12 +27,9 @@ class TestMembership(RanchiCommon):
         with self.assertRaises(ValidationError):
             member.action_vet_member()
 
-    def test_membership_fee_invoice_vets_on_payment(self):
+    def test_membership_fee_collected_vets_member(self):
         partner = self._make_member('Fee Member', confirm=False)
-        wizard = self.env['ranchi.membership.fee.wizard'].create({
-            'partner_id': partner.id, 'company_id': self.company.id, 'amount': 1000.0,
-            'register_payment': True, 'journal_id': self.bank_journal.id})
-        wizard.action_confirm()
+        self._collect_fees(partner, 1000.0)
         invoice = partner.membership_fee_move_id
         self.assertEqual(invoice.ranchi_move_type, 'membership_fee')
         self.assertIn(invoice.payment_state, ('paid', 'in_payment'))

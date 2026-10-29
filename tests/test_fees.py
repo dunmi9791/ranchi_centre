@@ -173,8 +173,7 @@ class TestFieldFees(RanchiCommon):
 
     def test_collection_settles_existing_fee_invoice(self):
         loan = self._approved_loan()
-        loan.action_create_fee_invoice()
-        invoice = loan.fee_move_id
+        invoice = loan._create_fee_invoice()
         self._collect(loan.member_id, fees=1100.0)
         self.assertEqual(loan.fee_move_id, invoice, "no second invoice")
         self.assertEqual(loan.state, 'fees')

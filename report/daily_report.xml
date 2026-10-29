@@ -246,7 +246,10 @@
         <td class="text-end" t-out="totals['arrears_bf']" t-options="money"/>
         <td class="text-end" t-out="totals['repaid']" t-options="money"/>
         <td class="text-end" t-out="totals['savings']" t-options="money"/>
-        <td class="text-end" t-out="totals['fees']" t-options="money"/>
+        <td class="text-end">
+            <t t-out="totals['fees']" t-options="money"/>
+            <small t-if="totals.get('fees_due')" class="text-muted d-block">of <t t-out="totals['fees_due']" t-options="money"/> due</small>
+        </td>
         <td class="text-end" t-out="totals['total']" t-options="money"/>
         <td t-att-class="'text-end text-danger fw-bold' if totals['shortfall'] else 'text-end'"
             t-out="totals['shortfall']" t-options="money"/>
@@ -264,7 +267,9 @@
             Loan collected counts repayments dated that day plus cash submitted by the officer and still waiting
             for the manager's confirmation (marked *). Payments clear arrears before the day's installment;
             shortfall is what remains unpaid of the day's installment and every member with a shortfall is a
-            defaulter. Repayment rate is the share of the expected amount that was met.
+            defaulter. Repayment rate is the share of the expected amount that was met. Fees "of X due" is what
+            the member still owed in registration fees and fees before disbursement when the day began; fees are
+            only paid through these collections and are not part of the expected amount or the shortfall.
         </p>
     </template>
 
@@ -343,7 +348,10 @@
                                                         <small t-if="r['from_savings']" class="text-muted"><br/>(<t t-out="r['from_savings']" t-options="money"/> from savings)</small>
                                                     </td>
                                                     <td class="text-end" t-out="r['savings']" t-options="money"/>
-                                                    <td class="text-end" t-out="r['fees']" t-options="money"/>
+                                                    <td class="text-end">
+                                                        <t t-out="r['fees']" t-options="money"/>
+                                                        <small t-if="r['fees_due']" class="text-muted d-block">of <t t-out="r['fees_due']" t-options="money"/> due</small>
+                                                    </td>
                                                     <td class="text-end" t-out="r['total']" t-options="money"/>
                                                     <td class="text-end fw-bold"><t t-if="r['shortfall']" t-out="r['shortfall']" t-options="money"/></td>
                                                     <td class="text-end" t-out="r['arrears_cf']" t-options="money"/>
@@ -355,7 +363,10 @@
                                                     <td class="text-end" t-out="totals['arrears_bf']" t-options="money"/>
                                                     <td class="text-end" t-out="totals['repaid']" t-options="money"/>
                                                     <td class="text-end" t-out="totals['savings']" t-options="money"/>
-                                                    <td class="text-end" t-out="totals['fees']" t-options="money"/>
+                                                    <td class="text-end">
+                                                        <t t-out="totals['fees']" t-options="money"/>
+                                                        <small t-if="totals['fees_due']" class="text-muted d-block">of <t t-out="totals['fees_due']" t-options="money"/> due</small>
+                                                    </td>
                                                     <td class="text-end" t-out="totals['total']" t-options="money"/>
                                                     <td class="text-end" t-out="totals['shortfall']" t-options="money"/>
                                                     <td/>
@@ -373,7 +384,10 @@
                                                 <td class="text-end" t-out="totals['arrears_bf']" t-options="money"/>
                                                 <td class="text-end" t-out="totals['repaid']" t-options="money"/>
                                                 <td class="text-end" t-out="totals['savings']" t-options="money"/>
-                                                <td class="text-end" t-out="totals['fees']" t-options="money"/>
+                                                <td class="text-end">
+                                                    <t t-out="totals['fees']" t-options="money"/>
+                                                    <small t-if="totals['fees_due']" class="text-muted d-block">of <t t-out="totals['fees_due']" t-options="money"/> due</small>
+                                                </td>
                                                 <td class="text-end" t-out="totals['total']" t-options="money"/>
                                                 <td class="text-end text-danger" t-out="totals['shortfall']" t-options="money"/>
                                                 <td/>

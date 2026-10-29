@@ -417,36 +417,6 @@ class ResPartner(models.Model):
                     balance=currency.format(partner.savings_balance), type=loan_type.name,
                     required=currency.format(required)))
 
-    def action_open_membership_fee_wizard(self):
-        self.ensure_one()
-        if not self.is_ranchi_member:
-            raise UserError(_("Mark the contact as a Ranchi member first."))
-        if self.membership_state != 'applied':
-            raise UserError(_("The membership fee is collected while the member is in 'Applied'."))
-        invoice = self.membership_fee_move_id
-        if invoice and invoice.state != 'cancel':
-            # already invoiced, e.g. by a field collection: register the payment on that invoice
-            return {
-                'type': 'ir.actions.act_window',
-                'res_model': 'account.move',
-                'res_id': invoice.id,
-                'view_mode': 'form',
-                'target': 'current',
-            }
-        company = self._ranchi_company()
-        return {
-            'name': _('Collect Membership Fee'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'ranchi.membership.fee.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_partner_id': self.id,
-                'default_amount': sum(item['amount'] for item in self._registration_fee_items()),
-                'default_company_id': company.id,
-            },
-        }
-
     def _on_membership_fee_paid(self):
         for partner in self:
             company = partner._ranchi_company()
