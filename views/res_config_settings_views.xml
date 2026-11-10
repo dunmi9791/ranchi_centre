@@ -39,6 +39,9 @@
                         <setting string="Loan Write-off Account">
                             <field name="ranchi_writeoff_account_id"/>
                         </setting>
+                        <setting string="Union Purse" help="Liability account holding the unions' purse money. Fees ticked 'Union Purse' on a loan type are credited here instead of income.">
+                            <field name="ranchi_union_purse_account_id"/>
+                        </setting>
                     </block>
                     <block title="Journals" name="ranchi_journals">
                         <setting string="Disbursement Journal" help="Bank or cash journal the loan principal leaves from.">

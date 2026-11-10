@@ -32,6 +32,11 @@ class ResCompany(models.Model):
     ranchi_writeoff_account_id = fields.Many2one(
         'account.account', string="Loan Write-off Account", check_company=True,
         domain="[('deprecated', '=', False)]")
+    ranchi_union_purse_account_id = fields.Many2one(
+        'account.account', string="Union Purse Account", check_company=True,
+        domain="[('deprecated', '=', False)]",
+        help="Liability account holding the unions' purse money: union purse fees are credited "
+             "here instead of income, and managers' purse entries move it in or out.")
 
     # ---- journals --------------------------------------------------------
     ranchi_disbursement_journal_id = fields.Many2one(

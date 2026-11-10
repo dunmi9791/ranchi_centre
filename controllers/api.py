@@ -193,6 +193,7 @@ class RanchiApiV1(http.Controller):
             'memberCount': u.member_count, 'confirmedMemberCount': u.confirmed_member_count,
             'activeLoanCount': u.active_loan_count,
             'loansOutstanding': self._money(u.loans_outstanding),
+            'purseBalance': self._money(u.purse_balance),
             'savingsTotal': self._money(u.savings_total),
             'branchId': u.company_id.id,
         }

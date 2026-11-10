@@ -71,3 +71,11 @@ access_wiz_portfolio_report_officer,ranchi.portfolio.report.wizard officer,model
 access_wiz_portfolio_report_auditor,ranchi.portfolio.report.wizard auditor,model_ranchi_portfolio_report_wizard,group_ranchi_auditor,1,1,1,1
 access_wiz_daily_report_officer,ranchi.daily.report.wizard officer,model_ranchi_daily_report_wizard,group_ranchi_officer,1,1,1,1
 access_wiz_daily_report_auditor,ranchi.daily.report.wizard auditor,model_ranchi_daily_report_wizard,group_ranchi_auditor,1,1,1,1
+access_union_purse_officer,ranchi.union.purse officer,model_ranchi_union_purse,group_ranchi_officer,1,0,0,0
+access_union_purse_accountant,ranchi.union.purse accountant,model_ranchi_union_purse,group_ranchi_accountant,1,0,0,0
+access_union_purse_manager,ranchi.union.purse manager,model_ranchi_union_purse,group_ranchi_manager,1,0,0,0
+access_union_purse_auditor,ranchi.union.purse auditor,model_ranchi_union_purse,group_ranchi_auditor,1,0,0,0
+access_union_purse_line_officer,ranchi.union.purse.line officer,model_ranchi_union_purse_line,group_ranchi_officer,1,0,0,0
+access_union_purse_line_accountant,ranchi.union.purse.line accountant,model_ranchi_union_purse_line,group_ranchi_accountant,1,0,0,0
+access_union_purse_line_manager,ranchi.union.purse.line manager,model_ranchi_union_purse_line,group_ranchi_manager,1,1,1,1
+access_union_purse_line_auditor,ranchi.union.purse.line auditor,model_ranchi_union_purse_line,group_ranchi_auditor,1,0,0,0

@@ -19,6 +19,8 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.ranchi_interest_expense_account_id', readonly=False)
     ranchi_writeoff_account_id = fields.Many2one(
         related='company_id.ranchi_writeoff_account_id', readonly=False)
+    ranchi_union_purse_account_id = fields.Many2one(
+        related='company_id.ranchi_union_purse_account_id', readonly=False)
 
     ranchi_disbursement_journal_id = fields.Many2one(
         related='company_id.ranchi_disbursement_journal_id', readonly=False)

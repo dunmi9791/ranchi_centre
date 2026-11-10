@@ -8,6 +8,8 @@
     <menuitem id="menu_ranchi_members_root" name="Members" parent="menu_ranchi_root" sequence="10"/>
     <menuitem id="menu_ranchi_members" name="Members" parent="menu_ranchi_members_root" action="action_ranchi_members" sequence="10"/>
     <menuitem id="menu_ranchi_unions" name="Unions" parent="menu_ranchi_members_root" action="action_ranchi_union" sequence="20"/>
+    <menuitem id="menu_ranchi_union_purses" name="Union Purses" parent="menu_ranchi_members_root" action="action_ranchi_union_purse" sequence="30"/>
+    <menuitem id="menu_ranchi_union_purse_lines" name="Purse Entries" parent="menu_ranchi_members_root" action="action_ranchi_union_purse_line" sequence="35"/>
 
     <menuitem id="menu_ranchi_loans_root" name="Loans" parent="menu_ranchi_root" sequence="20"/>
     <menuitem id="menu_ranchi_loans" name="Loans" parent="menu_ranchi_loans_root" action="action_ranchi_loan" sequence="10"/>

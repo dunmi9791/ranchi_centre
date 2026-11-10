@@ -375,4 +375,54 @@
         <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
         <field name="domain_force">[('loan_type_id.manager_ids', 'in', user.id)]</field>
     </record>
+
+    <!-- ===================== Union purse ===================== -->
+    <record id="rule_purse_company" model="ir.rule">
+        <field name="name">Union purse: own companies</field>
+        <field name="model_id" ref="model_ranchi_union_purse"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_purse_officer" model="ir.rule">
+        <field name="name">Union purse: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_union_purse"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_purse_branch" model="ir.rule">
+        <field name="name">Union purse: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_union_purse"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_purse_product_manager" model="ir.rule">
+        <field name="name">Union purse: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_union_purse"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
+
+    <!-- ===================== Union purse entry ===================== -->
+    <record id="rule_purse_line_company" model="ir.rule">
+        <field name="name">Union purse entry: own companies</field>
+        <field name="model_id" ref="model_ranchi_union_purse_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_purse_line_officer" model="ir.rule">
+        <field name="name">Union purse entry: credit officer sees own unions</field>
+        <field name="model_id" ref="model_ranchi_union_purse_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_officer'))]"/>
+        <field name="domain_force">[('union_id.credit_officer_user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_purse_line_branch" model="ir.rule">
+        <field name="name">Union purse entry: branch staff see all</field>
+        <field name="model_id" ref="model_ranchi_union_purse_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_accountant')), (4, ref('group_ranchi_auditor'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+    <record id="rule_purse_line_product_manager" model="ir.rule">
+        <field name="name">Union purse entry: product manager sees own loan types</field>
+        <field name="model_id" ref="model_ranchi_union_purse_line"/>
+        <field name="groups" eval="[(4, ref('group_ranchi_manager'))]"/>
+        <field name="domain_force">[('union_id.loan_type_id.manager_ids', 'in', user.id)]</field>
+    </record>
 </odoo>

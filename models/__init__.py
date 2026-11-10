@@ -3,6 +3,7 @@ from . import res_company
 from . import res_config_settings
 from . import account_move
 from . import ranchi_union
+from . import union_purse
 from . import res_partner
 from . import loan_type
 from . import resource_calendar_leaves

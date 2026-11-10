@@ -15,6 +15,7 @@
                 <field name="active_loan_count" string="Active Loans"/>
                 <field name="loans_outstanding" sum="Total"/>
                 <field name="savings_total" sum="Total"/>
+                <field name="purse_balance" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
                 <field name="state" widget="badge" decoration-success="state == 'active'" decoration-muted="state != 'active'"/>
             </list>
@@ -38,6 +39,9 @@
                             <field name="active_loan_count" widget="statinfo" string="Active Loans"/>
                         </button>
                         <button name="action_view_collections" type="object" class="oe_stat_button" icon="fa-briefcase" string="Collections"/>
+                        <button name="action_view_purse" type="object" class="oe_stat_button" icon="fa-archive">
+                            <field name="purse_balance" widget="statinfo" string="Union Purse"/>
+                        </button>
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title">
@@ -62,6 +66,7 @@
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="loans_outstanding"/>
                             <field name="savings_total"/>
+                            <field name="purse_balance"/>
                             <field name="active" invisible="1"/>
                         </group>
                     </group>

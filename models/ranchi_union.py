@@ -54,6 +54,11 @@ class RanchiUnion(models.Model):
     loans_outstanding = fields.Monetary(compute='_compute_financials', currency_field='currency_id')
     savings_total = fields.Monetary(compute='_compute_financials', currency_field='currency_id')
     collection_ids = fields.One2many('ranchi.collection', 'union_id', string="Collections")
+    purse_ids = fields.One2many('ranchi.union.purse', 'union_id', string="Purses")
+    purse_id = fields.Many2one('ranchi.union.purse', string="Union Purse", compute='_compute_purse')
+    purse_balance = fields.Monetary(
+        string="Purse Balance", compute='_compute_purse', currency_field='currency_id',
+        help="Money held in the union purse: union purse fees collected plus manager entries.")
 
     _sql_constraints = [
         ('name_company_uniq', 'unique(name, company_id)', 'A union with this name already exists in this branch.'),
@@ -64,7 +69,23 @@ class RanchiUnion(models.Model):
         for vals in vals_list:
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('ranchi.union') or '/'
-        return super().create(vals_list)
+        unions = super().create(vals_list)
+        unions._ensure_purse()
+        return unions
+
+    def _ensure_purse(self):
+        """Give every union in *self* its purse (created with the union, kept for life)."""
+        missing = self.sudo().filtered(lambda u: not u.purse_ids)
+        if missing:
+            self.env['ranchi.union.purse'].sudo().create([{'union_id': u.id} for u in missing])
+        return True
+
+    @api.depends('purse_ids.balance')
+    def _compute_purse(self):
+        for union in self:
+            purse = union.sudo().purse_ids[:1]
+            union.purse_id = purse.id
+            union.purse_balance = purse.balance
 
     @api.depends('member_ids', 'member_ids.membership_state', 'loan_ids.state')
     def _compute_counts(self):
@@ -140,6 +161,18 @@ class RanchiUnion(models.Model):
         action['domain'] = [('union_id', '=', self.id)]
         action['context'] = {'default_union_id': self.id}
         return action
+
+    def action_view_purse(self):
+        self.ensure_one()
+        self._ensure_purse()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Union Purse"),
+            'res_model': 'ranchi.union.purse',
+            'res_id': self.sudo().purse_ids[:1].id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
 
     def action_view_collections(self):
         self.ensure_one()

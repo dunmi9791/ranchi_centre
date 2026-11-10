@@ -272,11 +272,19 @@ class RanchiLoanTypeFee(models.Model):
         'product.product', string="Product", domain="[('sale_ok', '=', True)]",
         help="Decides the income account. Empty: the branch membership fee product for registration "
              "fees, the loan administration fee product for fees before disbursement.")
+    is_union_purse = fields.Boolean(
+        string="Goes to Union Purse",
+        help="The fee belongs to the member's union: it is booked to the branch's Union Purse "
+             "liability account instead of income and added to the union's purse once the loan's "
+             "fees are paid.")
     active = fields.Boolean(default=True)
 
-    @api.constrains('stage', 'amount_type', 'amount', 'rate')
+    @api.constrains('stage', 'amount_type', 'amount', 'rate', 'is_union_purse')
     def _check_fee(self):
         for fee in self:
+            if fee.is_union_purse and fee.stage != 'disbursement':
+                raise ValidationError(_(
+                    "%s: only fees before disbursement can go to the union purse.", fee.name))
             if fee.amount < 0 or fee.rate < 0:
                 raise ValidationError(_("Fee amounts cannot be negative."))
             if fee.stage == 'registration' and fee.amount_type == 'percent':

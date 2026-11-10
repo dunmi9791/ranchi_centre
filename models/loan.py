@@ -356,6 +356,7 @@ class RanchiLoan(models.Model):
                 if invoice.state == 'posted':
                     invoice.button_draft()
                 invoice.button_cancel()
+            loan._reverse_union_purse()
             loan.installment_ids.unlink()
         self.write({'state': 'cancelled'})
 
@@ -447,7 +448,8 @@ class RanchiLoan(models.Model):
                           'product': 'ranchi_service_charge_product_id'})
         for fee in self.loan_type_id.disbursement_fee_ids:
             items.append({'name': fee.name, 'amount': fee._amount_for(self.principal, currency),
-                          'product': fee.product_id or 'ranchi_admin_fee_product_id'})
+                          'product': fee.product_id or 'ranchi_admin_fee_product_id',
+                          'purse': fee.is_union_purse})
         return [item for item in items if not currency.is_zero(item['amount'])]
 
     def _create_fee_invoice(self):
@@ -460,13 +462,18 @@ class RanchiLoan(models.Model):
             product = item['product']
             if isinstance(product, str):
                 product = company._ranchi_require(product)
-            lines.append((0, 0, {
+            line = {
                 'product_id': product.id,
                 'name': f"{item['name']} - {self.name}",
                 'quantity': 1.0,
                 'price_unit': item['amount'],
                 'tax_ids': [(6, 0, product.taxes_id.filtered(lambda t: t.company_id == company).ids)],
-            }))
+            }
+            if item.get('purse'):
+                # held for the union, not Ranchi income
+                line['account_id'] = company._ranchi_require('ranchi_union_purse_account_id').id
+                line['tax_ids'] = [(5, 0, 0)]
+            lines.append((0, 0, line))
         invoice = self.env['account.move'].create({
             'move_type': 'out_invoice',
             'partner_id': self.member_id.id,
@@ -489,6 +496,63 @@ class RanchiLoan(models.Model):
             if loan.state == 'approved':
                 loan.write({'state': 'fees'})
                 loan.message_post(body=_("Fees settled. The loan is ready for disbursement."))
+                loan._credit_union_purse()
+
+    def _union_purse_fee_lines(self):
+        """Invoice lines of the fee invoice booked to the union purse account."""
+        self.ensure_one()
+        invoice = self.sudo().fee_move_id
+        account = self.company_id.sudo().ranchi_union_purse_account_id
+        if not invoice or invoice.state != 'posted' or not account:
+            return self.env['account.move.line']
+        return invoice.invoice_line_ids.filtered(lambda l: l.account_id == account)
+
+    def _credit_union_purse(self):
+        """Add the union purse fee of the paid fee invoice to the union's purse (once per loan)."""
+        PurseLine = self.env['ranchi.union.purse.line'].sudo()
+        for loan in self:
+            if not loan.union_id:
+                continue
+            amount = sum(loan._union_purse_fee_lines().mapped('price_subtotal'))
+            if loan.currency_id.is_zero(amount):
+                continue
+            if PurseLine.search_count([('loan_id', '=', loan.id), ('origin', '=', 'fee')]):
+                continue
+            loan.union_id._ensure_purse()
+            purse = loan.union_id.sudo().purse_ids[:1]
+            PurseLine.create({
+                'purse_id': purse.id,
+                'origin': 'fee',
+                'direction': 'credit',
+                'amount': amount,
+                'name': _("Union purse fee - %(loan)s (%(member)s)",
+                          loan=loan.name, member=loan.member_id.name),
+                'loan_id': loan.id,
+                'move_id': loan.sudo().fee_move_id.id,
+                'state': 'posted',
+            })
+            loan.message_post(body=_("%(amount)s added to the purse of %(union)s.",
+                                     amount=loan.currency_id.format(amount), union=loan.union_id.name))
+
+    def _reverse_union_purse(self):
+        """Take a cancelled loan's union purse fee back out of the purse."""
+        PurseLine = self.env['ranchi.union.purse.line'].sudo()
+        for loan in self:
+            lines = PurseLine.search([('loan_id', '=', loan.id), ('state', '=', 'posted')])
+            fee = sum(lines.filtered(lambda l: l.origin == 'fee').mapped('amount'))
+            reversed_ = sum(lines.filtered(lambda l: l.origin == 'reversal').mapped('amount'))
+            remaining = fee - reversed_
+            if loan.currency_id.compare_amounts(remaining, 0.0) <= 0:
+                continue
+            PurseLine.create({
+                'purse_id': lines[:1].purse_id.id,
+                'origin': 'reversal',
+                'direction': 'debit',
+                'amount': remaining,
+                'name': _("Union purse fee reversed - %s cancelled", loan.name),
+                'loan_id': loan.id,
+                'state': 'posted',
+            })
 
     def action_request_disbursement(self):
         self.ensure_one()

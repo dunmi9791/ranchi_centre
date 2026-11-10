@@ -11,6 +11,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
 * Fees invoiced before disbursement; principal booked to a loans receivable account
 * Disbursement queue (manual, Flutterwave, Monnify) with idempotent webhook log
 * Savings sub-ledger on a liability account: deposits, withdrawals, interest, fees, holds
+* Union purse per union (created with the union): union purse fees and manager entries on a liability account
 * Field collections posting loan repayments and savings deposits in one journal entry
 * Withdrawal requests with one or two approval levels, lapse adjustments, write-offs
 * JSON API v1 for the credit officer app, member portal, savings statement report
@@ -20,7 +21,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
     'author': 'Ranchi Empowerment Centre',
     'website': 'https://ranchi.example.com',
     'category': 'Accounting/Microfinance',
-    'version': '18.0.1.6.0',
+    'version': '18.0.1.7.0',
     'license': 'LGPL-3',
     'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web'],
     'data': [
@@ -32,6 +33,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'views/dashboard_views.xml',
         'views/res_config_settings_views.xml',
         'views/ranchi_union_views.xml',
+        'views/union_purse_views.xml',
         'views/res_partner_views.xml',
         'views/loan_type_views.xml',
         'views/public_holiday_views.xml',
