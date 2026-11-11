@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from unittest.mock import patch
+
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 
@@ -84,3 +87,99 @@ class TestCollectionHandover(RanchiCommon):
         self.assertEqual(collection.move_id.state, 'posted')
         self.assertAlmostEqual(loan.amount_paid, loan.installment_amount)
         self.assertAlmostEqual(self.member.savings_balance, 200.0)
+
+    def test_resaving_unchanged_lines_does_not_block_confirm(self):
+        """The web client echoes the one2many when Cash Received is saved."""
+        collection, _loan = self._collection()
+        collection.action_submit()
+        line = collection.line_ids
+        line.write({
+            'member_id': line.member_id.id,
+            'loan_id': line.loan_id.id,
+            'amount_loan': line.amount_loan,
+            'amount_savings': line.amount_savings,
+            'amount_fees': line.amount_fees,
+        })
+        self.assertEqual(collection.state, 'submitted')
+        with self.assertRaises(UserError):
+            line.write({'amount_savings': line.amount_savings + 50.0})
+
+    def test_confirm_cash_retry_does_not_double_book(self):
+        collection, loan = self._collection()
+        collection.action_submit()
+        mine = collection.with_user(self.env.user)
+        mine.amount_received = collection.amount_total
+        mine.action_confirm_cash()
+        move = collection.move_id
+        paid = loan.amount_paid
+        savings = self.member.savings_balance
+        repayments = collection.line_ids.repayment_ids
+        self.assertTrue(repayments)
+        self.assertTrue(collection.line_ids.savings_transaction_id)
+
+        # The button timed out in the browser but the row was posted.
+        mine.action_confirm_cash()
+        self.assertEqual(collection.state, 'posted')
+        self.assertEqual(collection.move_id, move)
+        self.assertEqual(collection.line_ids.repayment_ids, repayments)
+        self.assertEqual(collection.line_ids.savings_transaction_id.state, 'posted')
+        self.assertAlmostEqual(loan.amount_paid, paid)
+        self.assertAlmostEqual(self.member.savings_balance, savings)
+
+        # The entry was stored and the status write did not stick.
+        collection.sudo().write({'state': 'submitted'})
+        mine.action_confirm_cash()
+        self.assertEqual(collection.state, 'posted')
+        self.assertEqual(collection.move_id, move)
+        moves = self.env['account.move'].search([
+            ('ranchi_move_type', '=', 'collection'),
+            ('ref', '=', 'Field collection %s' % collection.name),
+        ])
+        self.assertEqual(moves, move)
+        self.assertEqual(collection.line_ids.repayment_ids, repayments)
+        self.assertAlmostEqual(loan.amount_paid, paid)
+        self.assertAlmostEqual(self.member.savings_balance, savings)
+
+    def test_partial_entry_is_not_posted_again(self):
+        collection, loan = self._collection()
+        collection.action_submit()
+        cash = self.bank_journal.default_account_id
+        move = self.env['account.move'].create({
+            'move_type': 'entry',
+            'journal_id': self.bank_journal.id,
+            'company_id': self.company.id,
+            'date': collection.date,
+            'ref': 'partial %s' % collection.name,
+            'line_ids': [
+                (0, 0, {'name': 'partial', 'account_id': cash.id, 'debit': 1.0, 'credit': 0.0}),
+                (0, 0, {
+                    'name': 'partial', 'account_id': self.savings_liability.id,
+                    'partner_id': self.member.id, 'debit': 0.0, 'credit': 1.0,
+                }),
+            ],
+        })
+        move.action_post()
+        collection.sudo().write({
+            'move_id': move.id,
+            'amount_received': collection.amount_total,
+            'received_by_id': self.env.uid,
+            'received_date': fields.Datetime.now(),
+        })
+        with self.assertRaises(UserError):
+            collection.action_confirm_cash()
+        self.assertEqual(collection.state, 'submitted')
+        self.assertEqual(collection.move_id, move)
+        self.assertFalse(collection.line_ids.repayment_ids)
+        self.assertAlmostEqual(loan.amount_paid, 0.0)
+        self.assertAlmostEqual(self.member.savings_balance, 1.0)
+
+    def test_unexpected_posting_error_is_a_user_error(self):
+        collection, _loan = self._collection()
+        collection.action_submit()
+        collection.amount_received = collection.amount_total
+        with patch.object(type(collection), '_create_collection_move', side_effect=RuntimeError('worker timed out')):
+            with self.assertRaises(UserError) as caught:
+                collection.action_confirm_cash()
+        self.assertIn('worker timed out', str(caught.exception))
+        self.assertEqual(collection.state, 'submitted')
+        self.assertFalse(collection.move_id)
