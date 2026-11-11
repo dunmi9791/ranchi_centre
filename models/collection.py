@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import AccessError, MissingError, RedirectWarning, UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
+# Business errors the web client already knows how to show. Anything else raised while
+# posting is turned into a UserError so the RPC payload keeps a data.message.
+_HANDLED_ERRORS = (UserError, ValidationError, AccessError, MissingError, RedirectWarning)
 
 MANAGER_GROUP = 'ranchi_centre.group_ranchi_manager'
 GENERAL_MANAGER_GROUP = 'ranchi_centre.group_ranchi_general_manager'
@@ -174,9 +181,17 @@ class RanchiCollection(models.Model):
         return True
 
     def action_confirm_cash(self):
-        """Manager confirms the cash counted matches the collection, then posts it."""
+        """Manager confirms the cash counted matches the collection, then posts it.
+
+        Safe to run again. A collection that already has its journal entry is not
+        booked a second time, so a retry after a lost response does not duplicate
+        repayments or deposits.
+        """
         self._check_manager()
+        todo = self.browse()
         for col in self:
+            if col.state == 'posted' and col.move_id:
+                continue
             if col.state != 'submitted':
                 raise UserError(_("The credit officer must submit the collection before the cash is confirmed."))
             if col.currency_id.compare_amounts(col.amount_received, col.amount_total) != 0:
@@ -185,24 +200,103 @@ class RanchiCollection(models.Model):
                     "Correct the count or return the collection to the officer.",
                     received=col.currency_id.format(col.amount_received),
                     total=col.currency_id.format(col.amount_total), ref=col.name))
-        self.write({'received_by_id': self.env.uid, 'received_date': fields.Datetime.now()})
-        return self.action_post()
+            todo |= col
+        if not todo:
+            return True
+        todo.write({'received_by_id': self.env.uid, 'received_date': fields.Datetime.now()})
+        return todo.action_post()
 
     def action_post(self):
         self._check_manager()
         for col in self:
-            if col.state != 'submitted':
-                raise UserError(_("Only collections whose cash has been submitted can be posted."))
-            if not col.line_ids:
-                raise UserError(_("Add at least one line before posting."))
-            if not col.received_by_id:
-                raise UserError(_("Confirm the cash received before posting %s.", col.name))
-            # The journal entry needs accounting rights the posting user may not have, so the
-            # posting runs as superuser once the manager check above has passed.
-            col.sudo()._post()
+            try:
+                # The journal entry needs accounting rights the posting user may not have, so the
+                # posting runs as superuser once the manager check above has passed.
+                col.sudo()._post()
+            except _HANDLED_ERRORS:
+                raise
+            except Exception as err:
+                # A database error has already aborted the cursor; let Odoo serialise it.
+                if type(err).__module__.split('.')[0] in ('psycopg2', 'psycopg'):
+                    raise
+                _logger.exception("Failed to post collection %s", col.display_name)
+                raise UserError(_(
+                    "Could not post %(ref)s: %(error)s",
+                    ref=col.display_name, error=err,
+                )) from err
         return True
 
+    def _lock_for_posting(self):
+        """Block a second confirmation of this row until the first one finishes."""
+        self.ensure_one()
+        if not self._table.isidentifier():
+            raise UserError(_("Cannot lock collection %s for posting.", self.display_name))
+        self.env.cr.execute(
+            'SELECT id FROM "%s" WHERE id = %%s FOR UPDATE' % self._table,
+            (self.id,),
+        )
+        self.invalidate_recordset()
+
     def _post(self):
+        self.ensure_one()
+        self._lock_for_posting()
+        if self.state == 'posted' and self.move_id:
+            return
+        if self.state == 'posted':
+            raise UserError(_(
+                "%s is marked posted but has no journal entry. It was not posted again.", self.name))
+        if self.state != 'submitted':
+            raise UserError(_("Only collections whose cash has been submitted can be posted."))
+        if not self.line_ids:
+            raise UserError(_("Add at least one line before posting."))
+        if not self.received_by_id:
+            raise UserError(_("Confirm the cash received before posting %s.", self.name))
+        move = self.move_id
+        if move and move.state == 'cancel':
+            move = self.env['account.move']
+        allocations_by_line = {}
+        if move:
+            # A previous attempt already created the entry. Finish the sub-ledger
+            # links if they are missing; never create a second entry.
+            self._refuse_partial_move(move)
+            self._refuse_unlinked_fees()
+            if move.state == 'draft':
+                move.action_post()
+        else:
+            for line in self.line_ids:
+                line._validate()
+            move, allocations_by_line = self._create_collection_move()
+        self._ensure_subledgers(move, allocations_by_line)
+        self.write({'state': 'posted', 'move_id': move.id})
+        self.message_post(body=_("Collection posted. Journal entry %s.", move.name))
+
+    def _booked_cash(self, move):
+        account = self.journal_id.default_account_id
+        return sum(move.line_ids.filtered(lambda line: line.account_id == account).mapped('debit'))
+
+    def _refuse_partial_move(self, move):
+        """A journal entry that does not cover the whole sheet must not be topped up."""
+        booked = self._booked_cash(move)
+        if self.currency_id.compare_amounts(booked, self.amount_total) == 0:
+            return
+        raise UserError(_(
+            "%(ref)s is only partly posted: journal entry %(move)s books %(booked)s of the "
+            "%(total)s collected. It was left untouched so repayments and deposits are not "
+            "booked a second time. Reverse that entry, or ask an accountant to finish it, "
+            "before confirming this collection again.",
+            ref=self.name, move=move.name or move.ref or move.id,
+            booked=self.currency_id.format(booked), total=self.currency_id.format(self.amount_total)))
+
+    def _refuse_unlinked_fees(self):
+        for line in self.line_ids:
+            if not self.currency_id.is_zero(line.amount_fees) and not line.fee_move_ids:
+                raise UserError(_(
+                    "%(ref)s already has journal entry %(move)s but the fees for %(member)s "
+                    "are not linked to it. It was not posted again.",
+                    ref=self.name, move=self.move_id.display_name, member=line.member_id.display_name))
+
+    def _create_collection_move(self):
+        """Create and post the single cash entry for this sheet. Fees are reconciled here."""
         self.ensure_one()
         company = self.company_id
         currency = self.currency_id
@@ -213,16 +307,14 @@ class RanchiCollection(models.Model):
         if not currency.is_zero(self.amount_savings_total):
             liability = company._ranchi_require('ranchi_savings_liability_account_id')
         fee_settlements = {}  # credit line label -> the invoice's open receivable lines
-
+        allocations_by_line = {}
         lines = [(0, 0, {
             'name': _("Collection %(ref)s - %(union)s", ref=self.name, union=self.union_id.name),
             'account_id': cash_account.id,
             'debit': self.amount_total,
             'credit': 0.0,
         })]
-        allocations_by_line = {}
         for line in self.line_ids:
-            line._validate()
             if not currency.is_zero(line.amount_loan):
                 allocations = line.loan_id._allocate_repayment(line.amount_loan)
                 allocations_by_line[line] = allocations
@@ -246,7 +338,13 @@ class RanchiCollection(models.Model):
                     remaining = currency.round(remaining - portion)
                     receivable = invoice.line_ids.filtered(
                         lambda l: l.display_type == 'payment_term' and not l.reconciled)
-                    label = _("%(ref)s fees %(invoice)s", ref=self.name, invoice=invoice.name)
+                    if not receivable:
+                        raise UserError(_(
+                            "Invoice %(invoice)s for %(member)s has no open receivable to settle.",
+                            invoice=invoice.display_name, member=line.member_id.display_name))
+                    # The line id keeps the label unique when two members share an invoice name.
+                    label = _("%(ref)s fees %(invoice)s line %(line)s",
+                              ref=self.name, invoice=invoice.name, line=line.id)
                     lines.append((0, 0, {
                         'name': label,
                         'account_id': receivable[:1].account_id.id,
@@ -276,32 +374,122 @@ class RanchiCollection(models.Model):
         for label, receivable in fee_settlements.items():
             credit = move.line_ids.filtered(lambda l: l.name == label and l.credit)
             (credit | receivable).reconcile()
+        return move, allocations_by_line
 
+    def _ensure_subledgers(self, move, allocations_by_line=None):
+        """Create missing repayment and deposit rows for an existing entry. Never a second entry.
+
+        *allocations_by_line* is the split already written on a move we just created. Recomputing
+        it after the first line is reconciled would see a lower balance and book the rest wrong.
+        """
+        self.ensure_one()
+        currency = self.currency_id
+        company = self.company_id
+        allocations_by_line = allocations_by_line or {}
+        liability = None
+        if any(not currency.is_zero(line.amount_savings) and not line.savings_transaction_id
+               for line in self.line_ids):
+            liability = company._ranchi_require('ranchi_savings_liability_account_id')
+        used_savings_lines = set(self.line_ids.mapped('savings_transaction_id.move_line_id').ids)
+        used_credit_ids = set(self.line_ids.repayment_ids.move_line_id.ids)
         Tx = self.env['ranchi.savings.transaction']
         for line in self.line_ids:
-            if line in allocations_by_line:
-                line.loan_id._register_repayments(
-                    move, allocations_by_line[line], 'collection', collection_line_id=line.id)
-            if not currency.is_zero(line.amount_savings):
-                liability_line = move.line_ids.filtered(
-                    lambda l: l.account_id == liability and l.partner_id == line.member_id and l.credit)[:1]
-                tx = Tx.create({
-                    'member_id': line.member_id.id,
-                    'company_id': company.id,
-                    'date': self.date,
-                    'amount': line.amount_savings,
-                    'type': 'deposit',
-                    'origin': 'collection',
-                    'journal_id': self.journal_id.id,
-                    'collection_line_id': line.id,
-                    'move_id': move.id,
-                    'move_line_id': liability_line.id,
-                    'note': _("Collected on %s", self.name),
-                    'state': 'posted',
-                })
-                line.savings_transaction_id = tx
-        self.write({'state': 'posted', 'move_id': move.id})
-        self.message_post(body=_("Collection posted. Journal entry %s.", move.name))
+            if not currency.is_zero(line.amount_loan):
+                allocations = allocations_by_line.get(line)
+                # A move just created has no repayment rows yet, so the allocations already
+                # written on it can be registered in one pass. An older entry may have only
+                # some of its installment credits linked; those are matched one by one.
+                if allocations and not line.repayment_ids:
+                    line.loan_id._register_repayments(
+                        move, allocations, 'collection', collection_line_id=line.id)
+                    used_credit_ids.update(line.repayment_ids.move_line_id.ids)
+                else:
+                    self._link_existing_repayments(line, move, used_credit_ids)
+            if currency.is_zero(line.amount_savings) or line.savings_transaction_id:
+                continue
+            liability_line = move.line_ids.filtered(
+                lambda l: l.account_id == liability and l.partner_id == line.member_id and l.credit
+                and l.id not in used_savings_lines
+                and currency.compare_amounts(l.credit, line.amount_savings) == 0)[:1]
+            if not liability_line:
+                raise UserError(_(
+                    "Journal entry %(move)s has no savings line left for %(member)s (%(amount)s). "
+                    "%(ref)s was not posted again.",
+                    move=move.display_name, member=line.member_id.display_name,
+                    amount=currency.format(line.amount_savings), ref=self.name))
+            used_savings_lines.add(liability_line.id)
+            tx = Tx.create({
+                'member_id': line.member_id.id,
+                'company_id': company.id,
+                'date': self.date,
+                'amount': line.amount_savings,
+                'type': 'deposit',
+                'origin': 'collection',
+                'journal_id': self.journal_id.id,
+                'collection_line_id': line.id,
+                'move_id': move.id,
+                'move_line_id': liability_line.id,
+                'note': _("Collected on %s", self.name),
+                'state': 'posted',
+            })
+            line.savings_transaction_id = tx
+
+    def _reconcile_repayment_credit(self, credit):
+        """Reconcile one collection credit with the installment it pays. Already reconciled is a no-op."""
+        installment = credit.ranchi_installment_id
+        if not installment or credit.reconciled:
+            return
+        receivable = installment.move_line_id
+        if not receivable:
+            raise UserError(_(
+                "Installment %(inst)s on %(loan)s has no receivable line to reconcile with %(move)s. "
+                "%(ref)s was not posted again.",
+                inst=installment.display_name, loan=installment.loan_id.display_name,
+                move=credit.move_id.display_name, ref=self.name))
+        (receivable | credit).reconcile()
+
+    def _link_existing_repayments(self, line, move, used_credit_ids):
+        """Link each of this line's installment credits that does not already have a repayment.
+
+        One repayment row does not mean the line is finished: a single collection line can pay
+        several installments, and only some of those credits may have been recorded.
+        """
+        currency = self.currency_id
+        loan = line.loan_id
+        own = line.repayment_ids.filtered(lambda repayment: repayment.move_line_id.move_id == move)
+        for repayment in own:
+            credit = repayment.move_line_id
+            used_credit_ids.add(credit.id)
+            self._reconcile_repayment_credit(credit)
+        covered = sum(own.mapped('amount'))
+        credits = move.line_ids.filtered(
+            lambda aml, loan=loan: aml.credit and aml.ranchi_installment_id
+            and aml.ranchi_installment_id.loan_id == loan and aml.id not in used_credit_ids)
+        Repayment = self.env['ranchi.loan.repayment']
+        for credit in credits:
+            if currency.compare_amounts(covered, line.amount_loan) >= 0:
+                break
+            if currency.compare_amounts(covered + credit.credit, line.amount_loan) > 0:
+                continue
+            Repayment.create({
+                'loan_id': loan.id,
+                'installment_id': credit.ranchi_installment_id.id,
+                'date': move.date,
+                'amount': credit.credit,
+                'source': 'collection',
+                'move_line_id': credit.id,
+                'collection_line_id': line.id,
+            })
+            used_credit_ids.add(credit.id)
+            covered = currency.round(covered + credit.credit)
+            self._reconcile_repayment_credit(credit)
+        if currency.compare_amounts(covered, line.amount_loan) != 0:
+            raise UserError(_(
+                "%(ref)s already has journal entry %(move)s but only %(covered)s of the %(paid)s "
+                "repayment for %(member)s is linked. It was not posted again.",
+                ref=self.name, move=move.display_name, member=line.member_id.display_name,
+                covered=currency.format(covered), paid=currency.format(line.amount_loan)))
+        loan._check_fully_paid()
 
     def action_cancel(self):
         for col in self:
@@ -370,18 +558,62 @@ class RanchiCollectionLine(models.Model):
         return lines
 
     def write(self, vals):
-        self._check_collection_editable()
-        return super().write(vals)
+        if not self.env.su:
+            self._check_collection_editable(vals)
+        # The form saves every line again when the manager records Cash Received. Rewriting
+        # unchanged lines re-runs their constraints (fee lookups per member) and is what makes
+        # that save heavy enough for a proxy to drop it. Skip a write that changes nothing.
+        changed = self.filtered(lambda line: line._vals_change(vals))
+        if not changed:
+            return True
+        return super(RanchiCollectionLine, changed).write(vals)
 
     def unlink(self):
         self._check_collection_editable()
         return super().unlink()
 
-    def _check_collection_editable(self):
+    def _check_collection_editable(self, vals=None):
         if self.env.su:
             return
-        if any(line.collection_id.state != 'draft' for line in self):
-            raise UserError(_("Lines can only be changed while the collection is a draft."))
+        locked = self.filtered(lambda line: line.collection_id.state != 'draft')
+        if not locked:
+            return
+        if vals is not None and not any(line._vals_change(vals) for line in locked):
+            return
+        raise UserError(_("Lines can only be changed while the collection is a draft."))
+
+    def _vals_change(self, vals):
+        """True when *vals* would actually modify this line (currency rounding counts as equal)."""
+        self.ensure_one()
+        currency = self.currency_id
+        for fname, value in vals.items():
+            field = self._fields.get(fname)
+            if not field:
+                continue
+            if field.type == 'many2one':
+                new_id = value.id if isinstance(value, models.BaseModel) else value
+                if (self[fname].id or False) != (new_id or False):
+                    return True
+            elif field.type in ('one2many', 'many2many'):
+                if value:
+                    return True
+            elif field.type in ('float', 'monetary'):
+                current = self[fname] or 0.0
+                new = value or 0.0
+                if currency:
+                    if currency.compare_amounts(current, new) != 0:
+                        return True
+                elif current != new:
+                    return True
+            elif field.type == 'integer':
+                if (self[fname] or 0) != (value or 0):
+                    return True
+            elif field.type == 'boolean':
+                if bool(self[fname]) != bool(value):
+                    return True
+            elif (self[fname] or False) != (value or False):
+                return True
+        return False
 
     @api.depends('amount_loan', 'amount_savings', 'amount_fees')
     def _compute_amount_total(self):
