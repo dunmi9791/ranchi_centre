@@ -391,15 +391,20 @@ class RanchiCollection(models.Model):
                for line in self.line_ids):
             liability = company._ranchi_require('ranchi_savings_liability_account_id')
         used_savings_lines = set(self.line_ids.mapped('savings_transaction_id.move_line_id').ids)
+        used_credit_ids = set(self.line_ids.repayment_ids.move_line_id.ids)
         Tx = self.env['ranchi.savings.transaction']
         for line in self.line_ids:
-            if not currency.is_zero(line.amount_loan) and not line.repayment_ids:
+            if not currency.is_zero(line.amount_loan):
                 allocations = allocations_by_line.get(line)
-                if allocations:
+                # A move just created has no repayment rows yet, so the allocations already
+                # written on it can be registered in one pass. An older entry may have only
+                # some of its installment credits linked; those are matched one by one.
+                if allocations and not line.repayment_ids:
                     line.loan_id._register_repayments(
                         move, allocations, 'collection', collection_line_id=line.id)
+                    used_credit_ids.update(line.repayment_ids.move_line_id.ids)
                 else:
-                    self._link_existing_repayments(line, move)
+                    self._link_existing_repayments(line, move, used_credit_ids)
             if currency.is_zero(line.amount_savings) or line.savings_transaction_id:
                 continue
             liability_line = move.line_ids.filtered(
@@ -429,34 +434,62 @@ class RanchiCollection(models.Model):
             })
             line.savings_transaction_id = tx
 
-    def _link_existing_repayments(self, line, move):
-        """Point a line at repayment credits already on *move* without adding another entry."""
-        linked = set(self.line_ids.repayment_ids.move_line_id.ids)
+    def _reconcile_repayment_credit(self, credit):
+        """Reconcile one collection credit with the installment it pays. Already reconciled is a no-op."""
+        installment = credit.ranchi_installment_id
+        if not installment or credit.reconciled:
+            return
+        receivable = installment.move_line_id
+        if not receivable:
+            raise UserError(_(
+                "Installment %(inst)s on %(loan)s has no receivable line to reconcile with %(move)s. "
+                "%(ref)s was not posted again.",
+                inst=installment.display_name, loan=installment.loan_id.display_name,
+                move=credit.move_id.display_name, ref=self.name))
+        (receivable | credit).reconcile()
+
+    def _link_existing_repayments(self, line, move, used_credit_ids):
+        """Link each of this line's installment credits that does not already have a repayment.
+
+        One repayment row does not mean the line is finished: a single collection line can pay
+        several installments, and only some of those credits may have been recorded.
+        """
+        currency = self.currency_id
         loan = line.loan_id
+        own = line.repayment_ids.filtered(lambda repayment: repayment.move_line_id.move_id == move)
+        for repayment in own:
+            credit = repayment.move_line_id
+            used_credit_ids.add(credit.id)
+            self._reconcile_repayment_credit(credit)
+        covered = sum(own.mapped('amount'))
         credits = move.line_ids.filtered(
             lambda aml, loan=loan: aml.credit and aml.ranchi_installment_id
-            and aml.ranchi_installment_id.loan_id == loan and aml.id not in linked)
-        if not credits:
+            and aml.ranchi_installment_id.loan_id == loan and aml.id not in used_credit_ids)
+        Repayment = self.env['ranchi.loan.repayment']
+        for credit in credits:
+            if currency.compare_amounts(covered, line.amount_loan) >= 0:
+                break
+            if currency.compare_amounts(covered + credit.credit, line.amount_loan) > 0:
+                continue
+            Repayment.create({
+                'loan_id': loan.id,
+                'installment_id': credit.ranchi_installment_id.id,
+                'date': move.date,
+                'amount': credit.credit,
+                'source': 'collection',
+                'move_line_id': credit.id,
+                'collection_line_id': line.id,
+            })
+            used_credit_ids.add(credit.id)
+            covered = currency.round(covered + credit.credit)
+            self._reconcile_repayment_credit(credit)
+        if currency.compare_amounts(covered, line.amount_loan) != 0:
             raise UserError(_(
-                "Journal entry %(move)s has no repayment line left for %(loan)s. "
-                "%(ref)s was not posted again.",
-                move=move.display_name, loan=loan.display_name, ref=self.name))
-        if all(credit.reconciled for credit in credits):
-            Repayment = self.env['ranchi.loan.repayment']
-            for credit in credits:
-                Repayment.create({
-                    'loan_id': loan.id,
-                    'installment_id': credit.ranchi_installment_id.id,
-                    'date': credit.date,
-                    'amount': credit.credit,
-                    'source': 'collection',
-                    'move_line_id': credit.id,
-                    'collection_line_id': line.id,
-                })
-            loan._check_fully_paid()
-            return
-        allocations = [(credit.ranchi_installment_id, credit.credit) for credit in credits]
-        loan._register_repayments(move, allocations, 'collection', collection_line_id=line.id)
+                "%(ref)s already has journal entry %(move)s but only %(covered)s of the %(paid)s "
+                "repayment for %(member)s is linked. It was not posted again.",
+                ref=self.name, move=move.display_name, member=line.member_id.display_name,
+                covered=currency.format(covered), paid=currency.format(line.amount_loan)))
+        loan._check_fully_paid()
 
     def action_cancel(self):
         for col in self:

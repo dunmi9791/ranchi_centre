@@ -140,6 +140,42 @@ class TestCollectionHandover(RanchiCommon):
         self.assertAlmostEqual(loan.amount_paid, paid)
         self.assertAlmostEqual(self.member.savings_balance, savings)
 
+    def test_missing_installment_repayment_is_recovered(self):
+        """One linked installment must not hide another open credit on the same entry."""
+        collection, loan = self._collection()
+        installments = loan.installment_ids.sorted('date_due')[:2]
+        collection.line_ids.amount_loan = sum(installments.mapped('amount_residual'))
+        collection.action_submit()
+        collection.amount_received = collection.amount_total
+        collection.action_confirm_cash()
+        line = collection.line_ids
+        self.assertEqual(len(line.repayment_ids), 2)
+        move = collection.move_id
+        paid = loan.amount_paid
+        savings_tx = line.savings_transaction_id
+        dropped = line.repayment_ids.sorted('id')[:1]
+        credit = dropped.move_line_id
+        dropped_amount = dropped.amount
+        dropped.unlink()
+        credit.remove_move_reconcile()
+        self.assertFalse(credit.reconciled)
+        self.assertEqual(len(line.repayment_ids), 1)
+        self.assertAlmostEqual(loan.amount_paid, paid - dropped_amount)
+
+        collection.sudo().write({'state': 'submitted'})
+        collection.action_confirm_cash()
+        self.assertEqual(collection.state, 'posted')
+        self.assertEqual(collection.move_id, move)
+        self.assertEqual(line.savings_transaction_id, savings_tx)
+        self.assertEqual(len(line.repayment_ids), 2)
+        self.assertTrue(credit.reconciled)
+        self.assertAlmostEqual(loan.amount_paid, paid)
+        moves = self.env['account.move'].search([
+            ('ranchi_move_type', '=', 'collection'),
+            ('ref', '=', 'Field collection %s' % collection.name),
+        ])
+        self.assertEqual(moves, move)
+
     def test_partial_entry_is_not_posted_again(self):
         collection, loan = self._collection()
         collection.action_submit()
