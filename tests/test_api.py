@@ -296,6 +296,53 @@ class TestOfficerApi(RanchiCommon, HttpCase):
             base, name='Nin Only', nin='22134478906', buildingType='face_me', idempotencyKey='web-mem-5'), key)
         self.assertEqual(self.env['res.partner'].browse(result['id']).building_type, 'face_me')
 
+    def test_officer_exits_member_and_member_rejoins(self):
+        key = self._key()
+        leaver = self.env['res.partner'].create({
+            'name': 'Leaving Member', 'is_ranchi_member': True, 'union_id': self.union.id,
+            'company_id': self.company.id, 'nin': '22134478920'})
+        leaver.action_vet_member()
+        leaver.action_confirm_member()
+        member = self._ok('/api/v1/members/%d' % leaver.id, {}, key)
+        self.assertTrue(member['canExit'])
+        self.assertIsNone(member['exitBlock'])
+
+        # a member with savings cannot exit: the API says why
+        self._deposit(self.member, 300.0)
+        blocked = self._ok('/api/v1/members/%d' % self.member.id, {}, key)
+        self.assertFalse(blocked['canExit'])
+        self.assertIn('savings', blocked['exitBlock'])
+        refused = self._rpc('/api/v1/members/%d/exit' % self.member.id, {'idempotencyKey': 'exit-0'}, key=key)
+        self.assertIn('error', refused)
+
+        out = self._ok('/api/v1/members/%d/exit' % leaver.id,
+                       {'reason': 'Relocated', 'idempotencyKey': 'exit-1'}, key)
+        self.assertEqual((out['status'], out['exitReason'], out['canExit']), ('exited', 'Relocated', False))
+        self.assertTrue(out['exitDate'])
+        # replayed by the outbox: same answer, no error
+        again = self._ok('/api/v1/members/%d/exit' % leaver.id, {'idempotencyKey': 'exit-1'}, key)
+        self.assertEqual(again['status'], 'exited')
+        deposit = self._rpc('/api/v1/savings/deposit', {
+            'memberId': leaver.id, 'amount': 100.0, 'idempotencyKey': 'dep-exited'}, key=key)
+        self.assertIn('error', deposit)
+
+        # registering the same NIN again re-opens the record as a new member
+        back = self._ok('/api/v1/members/create', {
+            'name': 'Leaving Member', 'unionId': self.union.id, 'nin': '22134478920',
+            'contactNumber': '08030000001', 'idempotencyKey': 'web-mem-rejoin'}, key)
+        self.assertEqual(back['id'], leaver.id)
+        self.assertTrue(back['rejoined'])
+        self.assertEqual(back['status'], 'applied')
+        self.assertIsNone(back['memberNumber'])
+        self.assertEqual(back['loanCycle'], 0)
+        self.assertEqual(leaver.membership_term, 2)
+
+        # a NIN of a member who has not exited is a duplicate
+        dup = self._rpc('/api/v1/members/create', {
+            'name': 'Copy', 'unionId': self.union.id, 'nin': '22134478920',
+            'idempotencyKey': 'web-mem-dup'}, key=key)
+        self.assertIn('error', dup)
+
     def test_officer_submits_loan_application(self):
         applicant = self._make_member('Member B')
         key = self._key()

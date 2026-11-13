@@ -54,6 +54,11 @@ class RanchiSavingsTransaction(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('ranchi.savings.transaction') or '/'
+            if vals.get('type', 'deposit') == 'deposit' and vals.get('member_id'):
+                member = self.env['res.partner'].browse(vals['member_id']).sudo()
+                if member.membership_state == 'exited':
+                    raise UserError(_("%s has exited. Register them again before taking savings.",
+                                      member.display_name))
         return super().create(vals_list)
 
     @api.ondelete(at_uninstall=False)

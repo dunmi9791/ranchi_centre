@@ -14,10 +14,14 @@
                             class="btn-primary" invisible="membership_state != 'vetted'"
                             groups="ranchi_centre.group_ranchi_accountant,ranchi_centre.group_ranchi_manager"/>
                     <button name="action_exit_member" type="object" string="Exit Member"
-                            invisible="membership_state != 'confirmed'" groups="ranchi_centre.group_ranchi_manager"
-                            confirm="The member will be marked as exited. Continue?"/>
+                            invisible="membership_state == 'exited' or not can_exit" groups="ranchi_centre.group_ranchi_officer"
+                            confirm="The member will be marked as exited. To come back later they must register again and pay the registration fees as a new member. Continue?"/>
+                    <button name="action_rejoin_member" type="object" string="Register Again"
+                            class="btn-primary" invisible="membership_state != 'exited'"
+                            groups="ranchi_centre.group_ranchi_officer"
+                            confirm="The member is registered again as a new member: registration fees and savings are due again, a new member number is issued on approval and the loan cycle restarts. Continue?"/>
                     <button name="action_reset_to_applied" type="object" string="Reset to Applied"
-                            invisible="membership_state not in ('vetted', 'exited')" groups="ranchi_centre.group_ranchi_manager"/>
+                            invisible="membership_state != 'vetted'" groups="ranchi_centre.group_ranchi_manager"/>
                     <field name="membership_state" widget="statusbar" statusbar_visible="applied,vetted,confirmed"/>
                 </header>
                 <div class="alert alert-info mb-0" role="alert"
@@ -53,6 +57,9 @@
                             <field name="credit_officer_id"/>
                             <field name="membership_date"/>
                             <field name="exit_date" invisible="not exit_date"/>
+                            <field name="exit_reason" invisible="not exit_reason"/>
+                            <field name="membership_term" invisible="membership_term &lt;= 1"/>
+                            <field name="can_exit" invisible="1"/>
                             <field name="membership_fee_move_id" invisible="not membership_fee_move_id"/>
                             <field name="registration_fee_total" invisible="membership_state not in ('applied', 'vetted')"/>
                             <field name="registration_fee_residual" invisible="membership_state not in ('applied', 'vetted')"

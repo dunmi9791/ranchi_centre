@@ -35,6 +35,14 @@ class TestMembership(RanchiCommon):
         self.assertIn(invoice.payment_state, ('paid', 'in_payment'))
         self.assertEqual(partner.membership_state, 'vetted')
 
+    def test_reset_to_applied_only_from_vetted(self):
+        partner = self._make_member('Reset Member', confirm=False)
+        partner.action_vet_member()
+        partner.action_reset_to_applied()
+        self.assertEqual(partner.membership_state, 'applied')
+        with self.assertRaises(UserError):
+            self.member.action_reset_to_applied()
+
     def test_cannot_exit_with_savings(self):
         self._deposit(self.member, 500.0)
         with self.assertRaises(UserError):

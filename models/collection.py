@@ -440,6 +440,8 @@ class RanchiCollectionLine(models.Model):
                     "%(member)s owes %(due)s of fees; %(paid)s was entered.",
                     member=self.member_id.display_name, due=currency.format(due),
                     paid=currency.format(self.amount_fees)))
+        if self.state == 'draft' and self.member_id.membership_state == 'exited':
+            raise ValidationError(_("%s has exited and cannot be collected from.", self.member_id.display_name))
         if self.amount_loan and not self.loan_id:
             raise ValidationError(_("Select the loan being repaid by %s.", self.member_id.display_name))
         if self.loan_id and self.loan_id.member_id != self.member_id:

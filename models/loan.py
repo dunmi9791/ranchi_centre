@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
+
 from markupsafe import Markup
 
 from odoo import api, fields, models, _
@@ -25,6 +27,10 @@ class RanchiLoan(models.Model):
         domain="[('is_ranchi_member', '=', True), ('membership_state', '=', 'confirmed')]")
     union_id = fields.Many2one(
         'ranchi.union', string="Union", related='member_id.union_id', store=True, readonly=True, index=True)
+    membership_term = fields.Integer(
+        string="Membership #", default=1, readonly=True, copy=False,
+        help="The member's membership this loan belongs to. Loans of an earlier membership "
+             "(before the member exited and joined again) do not count toward the loan cycle.")
     credit_officer_id = fields.Many2one(related='union_id.credit_officer_id', store=True, readonly=True)
     loan_type_id = fields.Many2one(
         'ranchi.loan.type', string="Loan Type", required=True, tracking=True,
@@ -47,7 +53,10 @@ class RanchiLoan(models.Model):
     date_approval = fields.Date(readonly=True, copy=False)
     date_first_due = fields.Date(
         string="First Installment Due", tracking=True,
-        compute='_compute_date_first_due', store=True, readonly=False)
+        compute='_compute_date_first_due', store=True, readonly=False,
+        help="Weekly loans pay on the union day: when the loan is disbursed the first installment "
+             "moves to the first union day after the disbursement day (at most 7 days later, one "
+             "more week if that day is a public holiday) and the later installments follow.")
     date_last_due = fields.Date(compute='_compute_date_last_due', string="Last Installment Due")
     date_disbursed = fields.Date(readonly=True, copy=False)
     date_closed = fields.Date(readonly=True, copy=False)
@@ -69,6 +78,10 @@ class RanchiLoan(models.Model):
     fee_residual = fields.Monetary(
         compute='_compute_fee_residual', string="Fees Still Due",
         help="What the credit officer still has to collect before the loan can be disbursed.")
+    fee_breakdown_html = fields.Html(
+        compute='_compute_fee_breakdown_html', string="Fee Breakdown", sanitize=False,
+        help="Each fee due before disbursement: the lines of the fee invoice once it exists, "
+             "otherwise the fees the loan type charges for the approved amount.")
     total_repayable = fields.Monetary(compute='_compute_amounts', string="Total Repayable")
     installment_amount = fields.Monetary(compute='_compute_amounts')
     installment_count = fields.Integer(related='loan_type_id.installment_count')
@@ -123,6 +136,12 @@ class RanchiLoan(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('ranchi.loan') or '/'
+            if vals.get('member_id') and 'membership_term' not in vals:
+                member = self.env['res.partner'].browse(vals['member_id']).sudo()
+                if member.membership_state == 'exited':
+                    raise UserError(_("%s has exited. Register them again before applying for a loan.",
+                                      member.display_name))
+                vals['membership_term'] = member.membership_term or 1
         return super().create(vals_list)
 
     @api.ondelete(at_uninstall=False)
@@ -142,12 +161,28 @@ class RanchiLoan(models.Model):
             if union_type:
                 loan.loan_type_id = union_type
 
-    @api.depends('date_application', 'loan_type_id')
+    @api.depends('date_application', 'loan_type_id', 'member_id.union_id.union_day')
     def _compute_date_first_due(self):
         for loan in self:
             if loan.date_first_due or not loan.loan_type_id or not loan.date_application:
                 continue
-            loan.date_first_due = loan.date_application + loan.loan_type_id._period_delta()
+            if loan._uses_union_day_schedule():
+                # A preview only: the date is fixed again when the loan is disbursed.
+                loan.date_first_due = loan._next_union_day(loan.date_application)
+            else:
+                loan.date_first_due = loan.date_application + loan.loan_type_id._period_delta()
+
+    def _uses_union_day_schedule(self):
+        """Weekly loans of a union with a union day pay on that day."""
+        self.ensure_one()
+        return bool(self.loan_type_id.installment_period == 'weekly'
+                    and self.member_id.union_id.union_day)
+
+    def _next_union_day(self, after):
+        """First union day strictly after *after*: 1 to 7 days later."""
+        self.ensure_one()
+        weekday = int(self.member_id.union_id.union_day)
+        return after + timedelta(days=(weekday - after.weekday() - 1) % 7 + 1)
 
     @api.depends('installment_ids.date_due', 'date_first_due', 'loan_type_id')
     def _compute_date_last_due(self):
@@ -202,6 +237,57 @@ class RanchiLoan(models.Model):
                 loan.fee_residual = invoice.amount_total
             else:
                 loan.fee_residual = loan.fee_total
+
+    @api.depends('state', 'fee_total', 'principal', 'fee_move_id.state', 'fee_move_id.amount_residual',
+                 'fee_move_id.invoice_line_ids.price_total', 'fee_move_id.invoice_line_ids.name')
+    def _compute_fee_breakdown_html(self):
+        for loan in self:
+            loan.fee_breakdown_html = loan._fee_breakdown_html()
+
+    def _fee_breakdown_rows(self):
+        """[(label, amount)] of the fees before disbursement: the posted fee invoice's lines when
+        there is one (what was actually billed), else the computed fee items."""
+        self.ensure_one()
+        invoice = self.sudo().fee_move_id
+        if invoice and invoice.state != 'cancel':
+            suffix = f" - {self.name}"
+            return [(line.name.removesuffix(suffix) if line.name else line.product_id.display_name,
+                     line.price_total)
+                    for line in invoice.invoice_line_ids.filtered(lambda l: l.display_type == 'product')]
+        return [(item['name'], item['amount']) for item in self._fee_items()]
+
+    def _fee_breakdown_html(self):
+        self.ensure_one()
+        if self.state in ('draft', 'applied') or not self.currency_id:
+            return False
+        currency = self.currency_id
+        fmt = lambda amount: currency.format(amount)  # noqa: E731
+        rows = self._fee_breakdown_rows()
+        if not rows:
+            return Markup('<p class="text-muted mb-0">%s</p>') % _("No fee is due before disbursement.")
+        total = sum(amount for __, amount in rows)
+        if self.state == 'approved':
+            due = self.fee_residual
+        elif self.state == 'cancelled':
+            due = None  # nothing to collect any more: show the fees only
+        else:
+            due = 0.0  # fees settled before disbursement
+        body = Markup().join(
+            Markup('<tr><td>%s</td><td class="text-end text-nowrap">%s</td></tr>') % (label, fmt(amount))
+            for label, amount in rows)
+        foot = Markup(
+            '<tr class="fw-bold border-top"><td>%s</td><td class="text-end text-nowrap">%s</td></tr>') % (
+            _("Total fees"), fmt(total))
+        if due is not None:
+            foot += Markup(
+                '<tr><td>%s</td><td class="text-end text-nowrap">%s</td></tr>'
+                '<tr class="%s"><td>%s</td><td class="text-end text-nowrap">%s</td></tr>') % (
+                _("Paid"), fmt(max(total - due, 0.0)),
+                'text-success' if currency.is_zero(due) else 'text-danger fw-bold', _("Still due"), fmt(due))
+        return Markup(
+            '<table class="table table-sm mb-0 o_ranchi_fee_breakdown">'
+            '<thead><tr><th>%s</th><th class="text-end">%s</th></tr></thead>'
+            '<tbody>%s</tbody><tfoot>%s</tfoot></table>') % (_("Fee"), _("Amount"), body, foot)
 
     @api.depends('installment_ids.amount_residual', 'installment_ids.amount_total', 'state')
     def _compute_balance(self):
@@ -265,6 +351,20 @@ class RanchiLoan(models.Model):
                 raise ValidationError(_(
                     "%(union)s runs %(type)s only: this loan cannot use %(other)s.",
                     union=loan.union_id.name, type=union_type.name, other=loan.loan_type_id.name))
+
+    @api.constrains('date_first_due', 'union_id', 'loan_type_id')
+    def _check_first_due_union_day(self):
+        weekdays = dict(self.env['ranchi.union']._fields['union_day']._description_selection(self.env))
+        for loan in self:
+            if loan.state not in ('draft', 'applied', 'approved', 'fees') or not loan.date_first_due:
+                continue
+            if not loan._uses_union_day_schedule():
+                continue
+            day = loan.member_id.union_id.union_day
+            if loan.date_first_due.weekday() != int(day):
+                raise ValidationError(_(
+                    "%(union)s meets on %(day)s: the first installment of a weekly loan must fall on "
+                    "that day.", union=loan.member_id.union_id.name, day=weekdays.get(day, day)))
 
     @api.constrains('stage_id', 'loan_type_id')
     def _check_stage_type(self):
@@ -386,6 +486,28 @@ class RanchiLoan(models.Model):
                     'amount_service': s,
                 })
             Installment.create(vals_list)
+
+    def _align_schedule_on_disbursement(self, disbursement_date):
+        """Weekly loans: the first installment is due on the first union day after the
+        disbursement day, the others weekly from there (moved off public holidays)."""
+        self.ensure_one()
+        if not self._uses_union_day_schedule() or not self.installment_ids:
+            return
+        installments = self.installment_ids.sorted('sequence')
+        if installments.filtered('move_line_id'):
+            return
+        old_first = installments[0].date_due
+        first = self._next_union_day(disbursement_date)
+        dates = self.loan_type_id._due_dates(first, len(installments), self.company_id)
+        for inst, due in zip(installments, dates):
+            if inst.date_due != due:
+                inst.date_due = due
+        if self.date_first_due != dates[0]:
+            self.date_first_due = dates[0]
+        if old_first != dates[0]:
+            self.message_post(body=_(
+                "Repayment schedule moved: first installment due %(new)s (was %(old)s), the first "
+                "union day after disbursement.", new=dates[0], old=old_first))
 
     def _reschedule_for_holidays(self):
         """Move the unpaid installments due from today onwards off public holidays (and
@@ -592,6 +714,7 @@ class RanchiLoan(models.Model):
         self.ensure_one()
         if self.state != 'fees':
             raise UserError(_("Loan %s is not awaiting disbursement.", self.name))
+        self._align_schedule_on_disbursement(fields.Date.context_today(self))
         company = self.company_id
         receivable = company._ranchi_require('ranchi_loan_receivable_account_id')
         if not receivable.reconcile:

@@ -61,6 +61,19 @@ class TestFieldFees(RanchiCommon):
         self.assertEqual(loan.fee_total, 1100.0)
         self.assertEqual([i['amount'] for i in loan._fee_items()], [500.0, 100.0, 300.0, 200.0])
 
+    def test_fee_breakdown_after_approval(self):
+        member = self._applicant()
+        member.membership_state = 'confirmed'
+        loan = self.env['ranchi.loan'].create({
+            'member_id': member.id, 'company_id': self.company.id,
+            'loan_type_id': self.fee_type.id, 'amount_applied': 10000.0})
+        self.assertFalse(loan.fee_breakdown_html, "No breakdown before approval")
+        loan.state = 'approved'
+        self.assertEqual([amount for __, amount in loan._fee_breakdown_rows()], [500.0, 100.0, 300.0, 200.0])
+        html = str(loan.fee_breakdown_html)
+        for label in ('Loan Administration Fee', 'Risk Premium', 'Loan form', 'Insurance', 'Still due'):
+            self.assertIn(label, html)
+
     # ---- registration ---------------------------------------------------
 
     def test_registration_dues(self):

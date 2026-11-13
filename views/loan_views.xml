@@ -125,6 +125,13 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Fees" name="fees" invisible="state in ('draft', 'applied')">
+                            <field name="fee_breakdown_html" nolabel="1" readonly="1"/>
+                            <div class="mt-2" invisible="not fee_move_id">
+                                <button name="action_view_fee_invoice" type="object" class="btn-link p-0"
+                                        icon="fa-file-text-o" string="Open fee invoice"/>
+                            </div>
+                        </page>
                         <page string="Schedule" name="schedule">
                             <field name="installment_ids" readonly="1">
                                 <list decoration-danger="status == 'overdue'" decoration-success="state == 'paid'" decoration-warning="status == 'due'">

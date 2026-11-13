@@ -210,7 +210,17 @@ class RanchiApiV1(http.Controller):
             'activeLoanId': p.active_loan_id.id or None,
             'canApplyLoan': p.can_apply_loan,
             'loanCycle': p.loan_cycle,
+            **self._ser_exit(p),
             **self._ser_dues(p),
+        }
+
+    def _ser_exit(self, p):
+        block = p._exit_block() if p.membership_state != 'exited' else None
+        return {
+            'exitDate': self._date(p.exit_date),
+            'exitReason': p.exit_reason or None,
+            'canExit': p.membership_state != 'exited' and not block,
+            'exitBlock': block or None,
         }
 
     def _ser_dues(self, p):
@@ -465,6 +475,7 @@ class RanchiApiV1(http.Controller):
 
         def create():
             union = self._record('ranchi.union', data['unionId'])
+            existing = self._existing_member(union.company_id, nin, bvn)
             vals = {
                 'name': data['name'],
                 'phone': data.get('contactNumber') or data.get('phone'),
@@ -493,14 +504,56 @@ class RanchiApiV1(http.Controller):
             vals = {k: v for k, v in vals.items() if v not in (None, '')}
             # Internal users can only read contacts; the officer's right to enrol into this union
             # was checked by _record(), so the partner itself is created as superuser.
-            partner = request.env['res.partner'].sudo().with_company(union.company_id).create(vals)
+            if existing:
+                # An exited member coming back is registered again on their own record, as a
+                # new member: fees and registration savings are due again, new member number.
+                vals.pop('membership_state', None)
+                existing.write(vals)
+                existing.action_rejoin_member()
+                partner = existing
+            else:
+                partner = request.env['res.partner'].sudo().with_company(union.company_id).create(vals)
             partner = partner.with_env(request.env)
             collection = self._registration_collection(union, partner, data.get('collect'))
             result = self._ser_member(partner)
+            result['rejoined'] = bool(existing)
             result['collection'] = self._ser_collection(collection) if collection else None
             return result
 
         return self._run(lambda: self._idempotent(data, 'members/create', create))
+
+    def _existing_member(self, company, nin, bvn):
+        """The member already registered in *company* with this NIN or BVN (as superuser), or an
+        empty recordset. An exited one is registered again; anyone else is a duplicate."""
+        Partner = request.env['res.partner'].sudo()
+        ids = [('nin', '=', nin)] if nin else []
+        if bvn:
+            ids = (['|'] + ids if ids else []) + [('bvn', '=', bvn)]
+        if not ids:
+            return Partner
+        found = Partner.search([('is_ranchi_member', '=', True),
+                                ('company_id', 'in', (company.id, False))] + ids, order='id desc')
+        member = found.filtered(lambda p: p.membership_state != 'exited')[:1] or found[:1]
+        if member and member.membership_state != 'exited':
+            raise BadRequest(
+                f"{member.name} ({member.member_number or member.membership_state}) is already a member"
+                f" of {member.union_id.name or 'this branch'}.")
+        return member
+
+    @api_route('/api/v1/members/<int:member_id>/exit')
+    def member_exit(self, member_id, **kw):
+        """The credit officer exits a member who has no open loan and no savings."""
+        self._authenticate()
+        data = self._params(kw)
+        member = self._member(member_id)
+        reason = (data.get('reason') or '').strip() or None
+
+        def do_exit():
+            member.action_exit_member(reason=reason)
+            member.invalidate_recordset()
+            return self._ser_member(member)
+
+        return self._run(lambda: self._idempotent(data, 'members/exit', do_exit))
 
     def _registration_collection(self, union, partner, collect):
         """Registration fees and opening savings taken by the officer when enrolling the member:
@@ -606,7 +659,11 @@ class RanchiApiV1(http.Controller):
                 'loan_type_id': loan_type.id,
                 'stage_id': int(data['stageId']) if data.get('stageId') else False,
                 'amount_applied': float(data['amount']),
-                'date_first_due': data.get('firstDueDate') or data.get('dateFirst') or False,
+                # Weekly loans pay on the union day: the server sets the first due date (and
+                # moves it to the first union day after disbursement), so ignore the app's.
+                # None is dropped below, letting the field compute its default.
+                'date_first_due': None if (loan_type.installment_period == 'weekly' and member.union_id.union_day)
+                else (data.get('firstDueDate') or data.get('dateFirst') or None),
                 'purpose': data.get('purpose'),
                 'avg_monthly_income': data.get('averageMonthlyIncome') or 0.0,
                 'has_family_in_union': bool(data.get('familyMemberRegisteredInUnion')),

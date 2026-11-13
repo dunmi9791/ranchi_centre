@@ -21,7 +21,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
     'author': 'Ranchi Empowerment Centre',
     'website': 'https://ranchi.example.com',
     'category': 'Accounting/Microfinance',
-    'version': '18.0.1.7.0',
+    'version': '18.0.1.8.0',
     'license': 'LGPL-3',
     'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web'],
     'data': [

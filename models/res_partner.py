@@ -41,6 +41,12 @@ class ResPartner(models.Model):
         string="Membership Status", default='applied', tracking=True, copy=False)
     membership_date = fields.Date(string="Member Since", readonly=True, copy=False)
     exit_date = fields.Date(readonly=True, copy=False)
+    exit_reason = fields.Char(readonly=True, copy=False, tracking=True)
+    membership_term = fields.Integer(
+        string="Membership #", default=1, readonly=True, copy=False,
+        help="How many times this person has joined. An exited member who comes back is "
+             "registered again as a new member: fees, member number and loan cycle start over.")
+    can_exit = fields.Boolean(compute='_compute_can_exit', string="Can Exit")
     union_id = fields.Many2one(
         'ranchi.union', string="Union", index=True, tracking=True, ondelete='restrict')
     credit_officer_id = fields.Many2one(
@@ -149,7 +155,7 @@ class ResPartner(models.Model):
             partner.registration_savings_required = required
             partner.registration_savings_due = max(0.0, required - partner.savings_balance)
 
-    @api.depends('loan_ids.state', 'loan_ids.balance')
+    @api.depends('loan_ids.state', 'loan_ids.balance', 'loan_ids.membership_term', 'membership_term')
     def _compute_loan_stats(self):
         for partner in self:
             loans = partner.loan_ids
@@ -157,8 +163,15 @@ class ResPartner(models.Model):
             active = loans.filtered(lambda l: l.state in ('applied', 'approved', 'fees', 'disbursed'))
             # Prefer the running loan: an early application for the next loan must not hide it.
             partner.active_loan_id = active.filtered(lambda l: l.state == 'disbursed')[:1] or active[:1]
-            partner.loan_cycle = len(loans.filtered(lambda l: l.state == 'paid'))
+            # A returning member starts again at cycle 0: only loans of this membership count.
+            partner.loan_cycle = len(loans.filtered(
+                lambda l: l.state == 'paid' and l.membership_term == partner.membership_term))
             partner.loans_outstanding = sum(active.mapped('balance'))
+
+    @api.depends('membership_state', 'loan_ids.state')
+    def _compute_can_exit(self):
+        for partner in self:
+            partner.can_exit = partner.is_ranchi_member and not partner._exit_block()
 
     @api.depends('loan_ids.state', 'loan_ids.installment_ids.state')
     def _compute_can_apply_loan(self):
@@ -445,20 +458,92 @@ class ResPartner(models.Model):
                 'is_ranchi_member': True,
             })
 
-    def action_exit_member(self):
+    def _exit_block(self):
+        """Why *self* cannot leave Ranchi now, or False. A member only exits with no open loan,
+        no savings (nor savings on hold) and no cash handed over for them but not posted yet."""
+        self.ensure_one()
+        partner = self.sudo()
+        currency = partner._ranchi_company().currency_id
+        if partner.membership_state == 'exited':
+            return _("%s has already exited.", partner.display_name)
+        loans = partner.loan_ids.filtered(lambda l: l.state in ('applied', 'approved', 'fees', 'disbursed'))
+        if loans:
+            return _("%(member)s still has loan %(loan)s open. It must be repaid, rejected or cancelled first.",
+                     member=partner.display_name, loan=loans[0].name)
+        if not currency.is_zero(partner.savings_balance):
+            return _("%(member)s still has %(amount)s in savings. Pay it out with a withdrawal first.",
+                     member=partner.display_name, amount=currency.format(partner.savings_balance))
+        if not currency.is_zero(partner.savings_on_hold):
+            return _("%s has a withdrawal or savings adjustment in progress.", partner.display_name)
+        pending = self.env['ranchi.collection.line'].sudo().search_count([
+            ('member_id', '=', partner.id), ('state', 'in', ('draft', 'submitted'))])
+        if pending:
+            return _("%s is on a collection that is not posted yet. Wait until the cash is confirmed.",
+                     partner.display_name)
+        invoice = partner.membership_fee_move_id
+        if invoice and invoice.state == 'posted' and not currency.is_zero(invoice.amount_total - invoice.amount_residual) \
+                and not currency.is_zero(invoice.amount_residual):
+            return _("%s has part-paid the registration fees. Collect the rest or refund it first.",
+                     partner.display_name)
+        return False
+
+    def action_exit_member(self, reason=None):
+        """Exit members with no loan and no savings. Credit officers may do this for their
+        unions' members (they cannot write contacts, so the write runs as superuser after the
+        caller's access to the member was checked)."""
+        today = fields.Date.context_today(self)
         for partner in self:
-            if partner.membership_state != 'confirmed':
-                raise UserError(_("Only confirmed members can exit."))
-            if partner.active_loan_id:
-                raise UserError(_("%s still has an active loan.", partner.display_name))
-            if partner.savings_balance:
-                raise UserError(_("%s still has a savings balance. Pay it out first.", partner.display_name))
-        self.write({'membership_state': 'exited', 'exit_date': fields.Date.context_today(self)})
+            partner.check_access('read')
+            block = partner._exit_block()
+            if block:
+                raise UserError(block)
+        for partner in self.sudo():
+            invoice = partner.membership_fee_move_id
+            if invoice and invoice.state != 'cancel' and invoice.payment_state in ('not_paid', False) \
+                    and not invoice.currency_id.is_zero(invoice.amount_residual):
+                # registration abandoned: the unpaid fees are no longer owed
+                if invoice.state == 'posted':
+                    invoice.button_draft()
+                invoice.button_cancel()
+            partner.write({
+                'membership_state': 'exited',
+                'exit_date': today,
+                'exit_reason': reason or False,
+            })
+            partner.message_post(author_id=self.env.user.partner_id.id, body=_(
+                "Member exited by %(user)s.%(reason)s", user=self.env.user.name,
+                reason=(" " + _("Reason: %s", reason)) if reason else ""))
+        return True
+
+    def action_rejoin_member(self):
+        """Register an exited member again as a new member: registration fees and savings are
+        due again, a new member number is issued on approval and the loan cycle restarts."""
+        for partner in self:
+            partner.check_access('read')
+            if partner.membership_state != 'exited':
+                raise UserError(_("Only exited members can be registered again."))
+        # officers cannot write contacts: written as superuser once access was checked
+        for partner in self.sudo():
+            old_number = partner.member_number
+            partner.write({
+                'membership_state': 'applied',
+                'membership_term': partner.membership_term + 1,
+                'member_number': False,
+                'membership_date': False,
+                'membership_fee_move_id': False,
+                'exit_date': False,
+                'exit_reason': False,
+            })
+            partner.message_post(author_id=self.env.user.partner_id.id, body=_(
+                "Registered again as a new member by %(user)s (previous member number %(number)s). "
+                "Registration fees apply again.", user=self.env.user.name, number=old_number or "-"))
+        return True
 
     def action_reset_to_applied(self):
         for partner in self:
-            if partner.membership_state not in ('vetted', 'exited'):
-                raise UserError(_("Only vetted or exited members can be reset to 'Applied'."))
+            if partner.membership_state != 'vetted':
+                raise UserError(_("Only vetted members can be reset to 'Applied'. "
+                                  "Exited members are registered again instead."))
         self.write({'membership_state': 'applied'})
 
     def _generate_member_number(self):

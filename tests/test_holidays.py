@@ -33,16 +33,17 @@ class TestHolidays(RanchiCommon):
         })
 
     def test_weekly_holiday_pushes_later_installments(self):
-        self._holiday(date(2030, 1, 21))
+        # The test union meets on Tuesday.
+        self._holiday(date(2030, 1, 22))
         loan = self.env['ranchi.loan'].create({
             'member_id': self.member.id, 'company_id': self.company.id,
             'loan_type_id': self.loan_type.id, 'amount_applied': 10000.0,
-            'date_first_due': date(2030, 1, 7)})
+            'date_first_due': date(2030, 1, 8)})
         loan.action_apply()
         loan.action_approve()
         self.assertEqual(
             loan.installment_ids.sorted('sequence').mapped('date_due'),
-            [date(2030, 1, 7), date(2030, 1, 14), date(2030, 1, 28), date(2030, 2, 4)])
+            [date(2030, 1, 8), date(2030, 1, 15), date(2030, 1, 29), date(2030, 2, 5)])
 
     def test_daily_skips_weekends_and_holidays(self):
         self._holiday(date(2030, 1, 16))  # Wednesday
