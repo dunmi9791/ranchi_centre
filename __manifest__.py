@@ -67,6 +67,7 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
             'ranchi_centre/static/src/dashboard/dashboard.scss',
             'ranchi_centre/static/src/dashboard/dashboard.js',
             'ranchi_centre/static/src/dashboard/dashboard.xml',
+            'ranchi_centre/static/src/views/form_error_patch.js',
         ],
     },
     'demo': [

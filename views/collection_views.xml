@@ -52,7 +52,7 @@
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
-                    <field name="move_id" invisible="1"/>
+                    <field name="move_id" invisible="1" groups="account.group_account_readonly"/>
                     <div class="alert alert-warning" role="alert" invisible="state != 'draft' or not return_reason">
                         Returned by the manager: <field name="return_reason" readonly="1" class="d-inline"/>
                     </div>
@@ -84,7 +84,8 @@
                                     <field name="fees_due" optional="show"/>
                                     <field name="amount_fees" sum="Fees"/>
                                     <field name="amount_total" sum="Total"/>
-                                    <field name="fee_move_ids" widget="many2many_tags" optional="hide" readonly="1"/>
+                                    <field name="fee_move_ids" widget="many2many_tags" optional="hide" readonly="1"
+                                           groups="account.group_account_readonly"/>
                                     <field name="note" optional="hide"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
@@ -109,7 +110,7 @@
                                     <field name="amount_received" readonly="1" string="Cash Received"
                                            groups="!ranchi_centre.group_ranchi_manager"/>
                                     <field name="received_by_id"/>
-                                    <field name="received_date"/>
+                                    <field name="received_date" readonly="1"/>
                                     <field name="return_reason" invisible="state != 'submitted'"
                                            groups="ranchi_centre.group_ranchi_manager"
                                            placeholder="Reason, if returning to the officer"/>
