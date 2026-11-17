@@ -17,13 +17,14 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
 * JSON API v1 for the credit officer app, member portal, savings statement report
 * Portfolio analysis and PDF reports: credit officer portfolio, portfolio at risk by branch, officer and union
 * Daily operations reports: disbursement master roll, daily collection sheet (expected vs collected), defaults of the day
+* Digest email KPIs: loans disbursed, loan collections and defaults, broken down by credit officer and union
     """,
     'author': 'Ranchi Empowerment Centre',
     'website': 'https://ranchi.example.com',
     'category': 'Accounting/Microfinance',
-    'version': '18.0.1.8.0',
+    'version': '18.0.1.9.0',
     'license': 'LGPL-3',
-    'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web'],
+    'depends': ['base', 'mail', 'account', 'hr', 'portal', 'web', 'digest'],
     'data': [
         'security/ranchi_security.xml',
         'security/ir.model.access.csv',
@@ -60,6 +61,8 @@ Single module replacing ranchi_loanee_management, ranchi_savings_management and 
         'report/daily_report.xml',
         'views/daily_report_views.xml',
         'views/portal_templates.xml',
+        'data/digest_data.xml',
+        'views/digest_views.xml',
         'views/menus.xml',
     ],
     'assets': {

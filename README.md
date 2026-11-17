@@ -24,6 +24,7 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 | Report | Savings statement | Wizard with date range, running balance |
 | Report | Portfolio analysis | `ranchi.portfolio.report` SQL view, one row per disbursed loan: outstanding, arrears, days in arrears, PAR >0/30/90 by branch, credit officer, union (pivot/graph/list) |
 | Report | Credit officer portfolio / Portfolio at risk | PDF wizard: per officer every union with its active loans and write-offs; PAR summary by branch, officer and union |
+| Digest email | `digest.digest` (inherited) | KPIs Total Loans Disbursed, Total Collections (Loans, Savings, Fees), Total Defaults (tiles for last 24h / 7 / 30 days vs the period before) plus a table by credit officer and union for the digest's own period. Collected = loans + savings + fees: loan repayments (no write-offs or savings adjustments), posted savings deposits, fees on field collections, plus loan/savings cash submitted but not yet confirmed (split shown per officer and in the total); defaults = unpaid at period end of installments due in the period, oldest installments paid first. Record "Ranchi Centre Loans Digest" (weekly) ships with only these KPIs |
 
 ## Accounting design
 
@@ -72,6 +73,8 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 6. Gateways: configure the webhook URL `/ranchi/webhook/flutterwave` (verif-hash) or
    `/ranchi/webhook/monnify` (HMAC-SHA512 of the body) in the provider dashboard.
 7. Enable the cron "Ranchi: monthly savings interest accrual" if interest is paid.
+8. Settings > Technical > Digest Emails (or Settings > Digest Emails): open "Ranchi Centre Loans Digest",
+   pick the period and subscribe the managers. Recipients need a Ranchi role; officers see only their unions.
 
 ## API v1 (JSON-RPC 2.0, POST)
 

@@ -18,3 +18,4 @@ from . import collection
 from . import lapse_adjustment
 from . import api_request
 from . import dashboard
+from . import digest

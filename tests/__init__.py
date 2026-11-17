@@ -17,3 +17,4 @@ from . import test_fees_collection_only
 from . import test_union_purse
 from . import test_first_installment
 from . import test_member_exit
+from . import test_digest

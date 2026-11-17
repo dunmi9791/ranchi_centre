@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Loan breakdown per credit officer and union, under the KPI tiles of the digest email -->
+    <template id="digest_mail_main" inherit_id="digest.digest_mail_main">
+        <xpath expr="//tr[@t-if='kpi_data']" position="after">
+            <t t-set="ranchi" t-value="object._ranchi_digest_breakdown(company, user)"/>
+            <tr t-if="ranchi">
+                <td style="padding: 0px 20px 20px 20px;" class="global_td">
+                    <div style="text-transform: uppercase; padding-bottom: 5px;">Loans by Credit Officer and Union</div>
+                    <div style="color: #878d97; font-size: 12px; padding-bottom: 10px;" t-out="ranchi['period']"/>
+                    <p t-if="not ranchi['officers']" style="color: #878d97; border-top: 1px solid #e6e6e6; padding-top: 10px;">
+                        No disbursements, collections or defaults in this period.
+                    </p>
+                    <table t-else="" cellspacing="0" cellpadding="6" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #d8dadd; color: #374151;">
+                                <th align="left">Credit Officer / Union</th>
+                                <th t-if="ranchi['show_disbursed']" align="right">Disbursed</th>
+                                <th t-if="ranchi['show_collected']" align="right">Collected</th>
+                                <th t-if="ranchi['show_defaults']" align="right">Defaults</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="ranchi['officers']" t-as="officer">
+                                <tr style="background-color: #F9FAFB; font-weight: bold; border-top: 1px solid #e6e6e6;">
+                                    <td t-out="officer['name']"/>
+                                    <td t-if="ranchi['show_disbursed']" align="right" style="white-space: nowrap;">
+                                        <t t-out="officer['disbursed']"/>
+                                        <div t-if="officer['loans']" style="font-weight: normal; color: #878d97; font-size: 11px;"><t t-out="officer['loans']"/> loan(s)</div>
+                                    </td>
+                                    <td t-if="ranchi['show_collected']" align="right" style="white-space: nowrap;">
+                                        <t t-out="officer['collected']"/>
+                                        <div style="font-weight: normal; color: #878d97; font-size: 11px;">Loans <t t-out="officer['collected_loans']"/> · Savings <t t-out="officer['collected_savings']"/> · Fees <t t-out="officer['collected_fees']"/></div>
+                                    </td>
+                                    <td t-if="ranchi['show_defaults']" align="right" style="white-space: nowrap;">
+                                        <t t-out="officer['defaults']"/>
+                                        <div t-if="officer['defaulters']" style="font-weight: normal; color: #878d97; font-size: 11px;"><t t-out="officer['defaulters']"/> member(s)</div>
+                                    </td>
+                                </tr>
+                                <tr t-foreach="officer['unions']" t-as="union">
+                                    <td style="padding-left: 20px;" t-out="union['name']"/>
+                                    <td t-if="ranchi['show_disbursed']" align="right" style="white-space: nowrap;" t-out="union['disbursed']"/>
+                                    <td t-if="ranchi['show_collected']" align="right" style="white-space: nowrap;" t-out="union['collected']"/>
+                                    <td t-if="ranchi['show_defaults']" align="right" style="white-space: nowrap;">
+                                        <t t-out="union['defaults']"/>
+                                        <span t-if="union['defaulters']" style="color: #878d97; font-size: 11px;"> (<t t-out="union['defaulters']"/>)</span>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid #374151; font-weight: bold;">
+                                <td>Total</td>
+                                <td t-if="ranchi['show_disbursed']" align="right" style="white-space: nowrap;" t-out="ranchi['totals']['disbursed']"/>
+                                <td t-if="ranchi['show_collected']" align="right" style="white-space: nowrap;">
+                                    <t t-out="ranchi['totals']['collected']"/>
+                                    <div style="font-weight: normal; color: #878d97; font-size: 11px;">Loans <t t-out="ranchi['totals']['collected_loans']"/> · Savings <t t-out="ranchi['totals']['collected_savings']"/> · Fees <t t-out="ranchi['totals']['collected_fees']"/></div>
+                                </td>
+                                <td t-if="ranchi['show_defaults']" align="right" style="white-space: nowrap;" t-out="ranchi['totals']['defaults']"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </td>
+            </tr>
+        </xpath>
+    </template>
+
+    <!-- A digest with only the loan KPIs. Subscribe managers from Settings > Digest Emails. -->
+    <data noupdate="1">
+        <record id="digest_digest_ranchi" model="digest.digest">
+            <field name="name">Ranchi Centre Loans Digest</field>
+            <field name="periodicity">weekly</field>
+            <field name="kpi_res_users_connected" eval="False"/>
+            <field name="kpi_mail_message_total" eval="False"/>
+            <field name="kpi_ranchi_disbursed" eval="True"/>
+            <field name="kpi_ranchi_collected" eval="True"/>
+            <field name="kpi_ranchi_defaults" eval="True"/>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>
