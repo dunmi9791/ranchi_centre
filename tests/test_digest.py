@@ -2,6 +2,8 @@
 from datetime import datetime, time, timedelta
 from unittest.mock import patch
 
+import pytz
+
 from odoo import fields
 from odoo.tests import tagged
 
@@ -140,3 +142,32 @@ class TestDigest(RanchiCommon):
         mail = self.env['mail.mail'].search([], order='id desc', limit=1)
         self.assertIn('Loans by Credit Officer and Union', mail.body_html)
         self.assertIn(self.union.name, mail.body_html)
+
+    def test_figures_computed_once_per_period(self):
+        """Building one email reads the 3 KPIs for 3 timeframes, current and previous, plus
+        the breakdown: at most one computation per distinct period."""
+        self._disbursed_loan(amount=10000.0)
+        self.digest.user_ids = self.env.user
+        Digest = type(self.digest)
+        original = Digest._ranchi_union_figures
+        periods = []
+
+        def counting(digest, date_from, date_to, companies):
+            periods.append((date_from, date_to))
+            return original(digest, date_from, date_to, companies)
+
+        with patch.object(Digest, '_ranchi_union_figures', counting):
+            self.digest._action_send_to_user(self.env.user, consume_tips=False)
+        self.assertTrue(periods)
+        self.assertEqual(len(periods), len(set(periods)))
+        self.assertLessEqual(len(periods), 7)
+        self.assertNotIn('ranchi_digest_figures', self.env.cr.cache)
+
+    def test_digest_cron_runs_before_field_work(self):
+        cron = self.env.ref('digest.ir_cron_digest_scheduler_action')
+        self.env['digest.digest']._ranchi_schedule_digest_cron()
+        main = self.env.ref('base.main_company')
+        tz = main.resource_calendar_id.tz or main.partner_id.tz or 'Africa/Lagos'
+        local = pytz.utc.localize(cron.nextcall).astimezone(pytz.timezone(tz))
+        self.assertEqual((local.hour, local.minute), (5, 0))
+        self.assertGreater(cron.nextcall, fields.Datetime.now())

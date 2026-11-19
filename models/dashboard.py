@@ -27,7 +27,9 @@ class RanchiDashboard(models.AbstractModel):
         'loans_pending': ('ranchi_centre.action_ranchi_loan', [('state', '=', 'applied')], {}),
         'loans_awaiting': ('ranchi_centre.action_ranchi_loan', [('state', 'in', ('approved', 'fees'))], {}),
         'installments_overdue': ('ranchi_centre.action_ranchi_loan_installment', [('status', '=', 'overdue')], {}),
-        'installments_today': ('ranchi_centre.action_ranchi_loan_installment', [('status', '=', 'due')], {}),
+        'installments_today': ('ranchi_centre.action_ranchi_loan_installment', 'due_today', {}),
+        'installments_today_paid': ('ranchi_centre.action_ranchi_loan_installment', 'due_today_paid', {}),
+        'installments_today_unpaid': ('ranchi_centre.action_ranchi_loan_installment', 'due_today_unpaid', {}),
         'savings': ('ranchi_centre.action_ranchi_savings_transaction', [('state', '=', 'posted')], {}),
         'withdrawals_pending': ('ranchi_centre.action_ranchi_withdrawal_request',
                                 [('state', 'in', ('submitted', 'approved_l1', 'approved'))], {}),
@@ -59,6 +61,33 @@ class RanchiDashboard(models.AbstractModel):
         today = today or self._today()
         return ['|', ('meeting_frequency', '=', 'daily'),
                 '&', ('meeting_frequency', '=', 'weekly'), ('union_day', '=', str(today.weekday()))]
+
+    @api.model
+    def _due_today_domain(self, today=None):
+        """Every installment scheduled for today, paid or not. Loans settled in full today
+        (state ``paid``) stay in; cancelled and written-off loans do not."""
+        today = today or self._today()
+        return [('date_due', '=', today), ('loan_state', 'in', ('disbursed', 'paid'))]
+
+    @api.model
+    def _due_today_figures(self, today):
+        """Installments due today, split into those already paid and what is left to collect.
+        Part-payments count toward the paid amount; the installment stays in the unpaid count."""
+        figures = {
+            'due_today': 0, 'due_today_amount': 0.0,
+            'due_today_paid': 0, 'due_today_paid_amount': 0.0,
+            'due_today_unpaid': 0, 'due_today_unpaid_amount': 0.0,
+        }
+        groups = self.env['ranchi.loan.installment']._read_group(
+            self._due_today_domain(today), ['state'],
+            ['__count', 'amount_total:sum', 'amount_paid:sum', 'amount_residual:sum'])
+        for state, count, total, paid, residual in groups:
+            figures['due_today'] += count
+            figures['due_today_amount'] += total or 0.0
+            figures['due_today_paid_amount'] += paid or 0.0
+            figures['due_today_unpaid_amount'] += residual or 0.0
+            figures['due_today_paid' if state == 'paid' else 'due_today_unpaid'] += count
+        return figures
 
     @api.model
     def _member_domain(self, unions):
@@ -118,7 +147,6 @@ class RanchiDashboard(models.AbstractModel):
         overdue_residual = self._sum('ranchi.loan.installment', overdue_domain, 'amount_residual')
         overdue_count = Installment.search_count(overdue_domain)
         overdue_loans = Installment._read_group(overdue_domain, ['loan_id'], ['__count'])
-        due_today_domain = [('status', '=', 'due')]
 
         posted_savings = [('state', '=', 'posted')]
         month_savings = posted_savings + [('date', '>=', month_start), ('date', '<=', today)]
@@ -171,8 +199,7 @@ class RanchiDashboard(models.AbstractModel):
                 'overdue_installments': overdue_count,
                 'overdue_loans': len(overdue_loans),
                 'par': (overdue_residual / outstanding * 100.0) if outstanding else 0.0,
-                'due_today': Installment.search_count(due_today_domain),
-                'due_today_amount': self._sum('ranchi.loan.installment', due_today_domain, 'amount_residual'),
+                **self._due_today_figures(today),
             },
             'savings': {
                 'total': self._savings_total(members),
@@ -272,6 +299,12 @@ class RanchiDashboard(models.AbstractModel):
             domain = self._meeting_today_domain()
         elif domain == 'today':
             domain = [('date', '=', self._today())]
+        elif domain == 'due_today':
+            domain = self._due_today_domain()
+        elif domain == 'due_today_paid':
+            domain = self._due_today_domain() + [('state', '=', 'paid')]
+        elif domain == 'due_today_unpaid':
+            domain = self._due_today_domain() + [('state', '!=', 'paid')]
         if loan_type_id is not None:
             domain = domain + [('loan_type_id', '=', loan_type_id or False)]
         if state:

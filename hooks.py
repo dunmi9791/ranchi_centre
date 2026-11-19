@@ -22,3 +22,4 @@ def post_init_hook(env):
         companies = env['res.company'].search([])
         for company in companies:
             company.write({k: v for k, v in vals.items() if not company[k]})
+    env['digest.digest']._ranchi_schedule_digest_cron()

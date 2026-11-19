@@ -93,6 +93,12 @@
     }
 
     .o_ranchi_row_label { color: var(--o-text-muted, #6c757d); }
+    // Breakdown of the row above it (e.g. installments due today -> paid / still to collect).
+    .o_ranchi_row_sub {
+        padding-left: 1rem;
+        border-top-style: dashed;
+        font-size: 0.92em;
+    }
     .o_ranchi_row_value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
     .o_ranchi_chart {

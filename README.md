@@ -75,6 +75,10 @@ application. Background and design rationale: `../docs/legacy_modules_review.md`
 7. Enable the cron "Ranchi: monthly savings interest accrual" if interest is paid.
 8. Settings > Technical > Digest Emails (or Settings > Digest Emails): open "Ranchi Centre Loans Digest",
    pick the period and subscribe the managers. Recipients need a Ranchi role; officers see only their unions.
+   Install/upgrade moves Odoo's digest cron to 05:00 local time so it never runs during field
+   collections; avoid "Send Now" during the day (it builds every recipient's email inside a web
+   request). Run Odoo with `workers >= 2` and `max_cron_threads = 1` so crons do not share a
+   process with the `/api/v1` requests.
 
 ## API v1 (JSON-RPC 2.0, POST)
 

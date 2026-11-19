@@ -81,6 +81,19 @@
                             <t t-set="key" t-value="'installments_today'"/>
                         </t>
                         <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Paid'"/>
+                            <t t-set="value" t-value="int(d.loans.due_today_paid) + ' · ' + money(d.loans.due_today_paid_amount, true)"/>
+                            <t t-set="key" t-value="'installments_today_paid'"/>
+                            <t t-set="indent" t-value="true"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
+                            <t t-set="label" t-value="'Still to collect'"/>
+                            <t t-set="value" t-value="int(d.loans.due_today_unpaid) + ' · ' + money(d.loans.due_today_unpaid_amount, true)"/>
+                            <t t-set="key" t-value="'installments_today_unpaid'"/>
+                            <t t-set="indent" t-value="true"/>
+                            <t t-set="badge" t-value="d.loans.due_today_unpaid > 0"/>
+                        </t>
+                        <t t-call="ranchi_centre.DashboardRow">
                             <t t-set="label" t-value="'Collections recorded'"/>
                             <t t-set="value" t-value="int(d.collections.today) + ' · ' + money(d.collections.today_amount, true)"/>
                             <t t-set="key" t-value="'collections_today'"/>
@@ -246,7 +259,7 @@
     </t>
 
     <t t-name="ranchi_centre.DashboardRow">
-        <div t-att-class="'o_ranchi_row' + (key ? ' o_ranchi_link' : '')"
+        <div t-att-class="'o_ranchi_row' + (key ? ' o_ranchi_link' : '') + (indent ? ' o_ranchi_row_sub' : '')"
              t-on-click="() => key ? this.open(key) : null" t-att-role="key ? 'button' : null">
             <span class="o_ranchi_row_label"><t t-esc="label"/></span>
             <span t-att-class="'o_ranchi_row_value' + (badge ? ' badge rounded-pill text-bg-' + (tone || 'warning') : '')">

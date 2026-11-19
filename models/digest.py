@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import pytz
 from dateutil.relativedelta import relativedelta
 
-from odoo import _, fields, models, tools
+from odoo import _, api, fields, models, tools
+from odoo.tools import SQL
 from odoo.exceptions import AccessError
 
 LOAN_KPIS = ('kpi_ranchi_disbursed', 'kpi_ranchi_collected', 'kpi_ranchi_defaults')
 BOOKED_LOAN_STATES = ('disbursed', 'paid', 'written_off')
+DIGEST_HOUR = 5
+DIGEST_TZ = 'Africa/Lagos'
+# Key in ``cr.cache`` of the figures memo, alive only while one digest email is built.
+FIGURES_CACHE = 'ranchi_digest_figures'
 PERIODS = {
     'daily': relativedelta(days=1),
     'weekly': relativedelta(weeks=1),
@@ -71,7 +76,7 @@ class DigestDigest(models.Model):
     def _ranchi_set_kpi(self, field_name, key):
         self._ranchi_check_access()
         date_from, date_to = self._ranchi_kpi_period()
-        rows = self._ranchi_union_figures(date_from, date_to, self._ranchi_kpi_companies())
+        rows = self._ranchi_cached_figures(date_from, date_to, self._ranchi_kpi_companies())
         per_company = defaultdict(float)
         for union, figures in rows.items():
             per_company[union.company_id.id] += figures[key]
@@ -97,9 +102,47 @@ class DigestDigest(models.Model):
         res['kpi_ranchi_defaults'] = f'ranchi_centre.action_ranchi_loan_installment{suffix}'
         return res
 
+    @api.model
+    def _ranchi_schedule_digest_cron(self, hour=DIGEST_HOUR):
+        """Run the digest cron before field work starts (it otherwise runs at whatever time
+        the digest module was installed, often during collections)."""
+        cron = self.env.ref('digest.ir_cron_digest_scheduler_action', raise_if_not_found=False)
+        if not cron:
+            return
+        company = self.env.ref('base.main_company', raise_if_not_found=False) or self.env.company
+        tz = pytz.timezone(company.resource_calendar_id.tz or company.partner_id.tz or DIGEST_TZ)
+        now = datetime.now(tz)
+        day = now.date() if now.hour < hour else now.date() + timedelta(days=1)
+        run = tz.localize(datetime.combine(day, time(hour)))
+        cron.sudo().write({
+            'nextcall': run.astimezone(pytz.utc).replace(tzinfo=None),
+            'interval_number': 1,
+            'interval_type': 'days',
+        })
+
+    def _action_send_to_user(self, user, tips_count=1, consume_tips=True):
+        # Odoo reads every KPI field for 3 timeframes, current and previous period, and
+        # invalidates it in between; the 3 loan KPIs share their figures, so compute each
+        # period once per email instead of once per field and read.
+        cache = self.env.cr.cache
+        cache[FIGURES_CACHE] = {}
+        try:
+            return super()._action_send_to_user(user, tips_count=tips_count, consume_tips=consume_tips)
+        finally:
+            cache.pop(FIGURES_CACHE, None)
+
     # ------------------------------------------------------------------
     # Figures per union
     # ------------------------------------------------------------------
+    def _ranchi_cached_figures(self, date_from, date_to, companies):
+        memo = self.env.cr.cache.get(FIGURES_CACHE)
+        if memo is None:
+            return self._ranchi_union_figures(date_from, date_to, companies)
+        key = (self.env.uid, tuple(sorted(companies.ids)), date_from, date_to)
+        if key not in memo:
+            memo[key] = self._ranchi_union_figures(date_from, date_to, companies)
+        return memo[key]
+
     def _ranchi_union_figures(self, date_from, date_to, companies):
         """union -> {'disbursed', 'loans', 'collected', 'collected_loans', 'collected_savings',
         'collected_fees', 'defaults', 'defaulters'} for
@@ -144,44 +187,67 @@ class DigestDigest(models.Model):
 
         for union, (amount, members) in self._ranchi_defaults(date_from, date_to, base).items():
             rows[union]['defaults'] += amount
-            rows[union]['defaulters'] += len(members)
+            rows[union]['defaulters'] += members
 
         return {union: vals for union, vals in rows.items()
                 if any(vals[k] for k in ('disbursed', 'collected', 'defaults'))}
 
     def _ranchi_defaults(self, date_from, date_to, base):
-        """union -> (unpaid amount, member ids) of installments due in the period."""
+        """union -> (unpaid amount, number of members) of installments due in the period.
+
+        One query: payments up to the end of the period (repayments other than write-offs and
+        loan cash submitted but not yet confirmed) are spread over each loan's installments
+        oldest first, as on the Daily Collection Sheet, so older arrears absorb them before
+        the period's installments. Record rules apply through the installments searched.
+        """
         Installment = self.env['ranchi.loan.installment']
-        loans = Installment.search(base + [
+        due = Installment._search(base + [
             ('loan_state', 'in', BOOKED_LOAN_STATES),
             ('date_due', '>=', date_from), ('date_due', '<', date_to),
-        ]).loan_id
-        result = defaultdict(lambda: [0.0, set()])
-        if not loans:
+        ])
+        if due.is_empty():
             return {}
-        # Every installment of those loans due before the end, so older arrears absorb
-        # payments first, as on the Daily Collection Sheet.
-        installments = Installment.search([
-            ('loan_id', 'in', loans.ids), ('date_due', '<', date_to)], order='loan_id, date_due, sequence')
-        settled = dict(self.env['ranchi.loan.repayment']._read_group(
-            [('loan_id', 'in', loans.ids), ('source', '!=', 'writeoff'), ('date', '<', date_to)],
-            ['loan_id'], ['amount:sum']))
-        pending = dict(self.env['ranchi.collection.line']._read_group(
-            [('loan_id', 'in', loans.ids), ('state', '=', 'submitted'), ('date', '<', date_to)],
-            ['loan_id'], ['amount_loan:sum']))
-        for loan, insts in installments.grouped('loan_id').items():
-            paid = (settled.get(loan) or 0.0) + (pending.get(loan) or 0.0)
-            unpaid = 0.0
-            for inst in insts:
-                share = min(paid, inst.amount_total)
-                paid -= share
-                if inst.date_due >= date_from:
-                    unpaid += inst.amount_total - share
-            if not loan.currency_id.is_zero(unpaid) and unpaid > 0:
-                entry = result[loan.union_id]
-                entry[0] += unpaid
-                entry[1].add(loan.member_id.id)
-        return {union: tuple(vals) for union, vals in result.items()}
+        for model in ('ranchi.loan.installment', 'ranchi.loan.repayment', 'ranchi.collection.line'):
+            self.env[model].flush_model()
+        self.env.cr.execute(SQL("""
+            WITH loans AS (
+                SELECT DISTINCT loan_id FROM ranchi_loan_installment WHERE id IN %(due)s
+            ), paid AS (
+                SELECT loan_id, SUM(amount) AS amount FROM (
+                    SELECT rep.loan_id, rep.amount
+                      FROM ranchi_loan_repayment rep
+                     WHERE rep.loan_id IN (SELECT loan_id FROM loans)
+                       AND rep.source != 'writeoff' AND rep.date < %(date_to)s
+                    UNION ALL
+                    SELECT line.loan_id, line.amount_loan
+                      FROM ranchi_collection_line line
+                     WHERE line.loan_id IN (SELECT loan_id FROM loans)
+                       AND line.state = 'submitted' AND line.date < %(date_to)s
+                ) payments
+                GROUP BY loan_id
+            ), inst AS (
+                SELECT i.loan_id, i.union_id, i.member_id, i.date_due, i.amount_total,
+                       SUM(i.amount_total) OVER (
+                           PARTITION BY i.loan_id ORDER BY i.date_due, i.sequence, i.id) AS cum_due
+                  FROM ranchi_loan_installment i
+                 WHERE i.loan_id IN (SELECT loan_id FROM loans) AND i.date_due < %(date_to)s
+            ), unpaid AS (
+                SELECT inst.union_id, inst.member_id,
+                       LEAST(inst.amount_total,
+                             GREATEST(0, inst.cum_due - COALESCE(paid.amount, 0))) AS amount
+                  FROM inst
+             LEFT JOIN paid ON paid.loan_id = inst.loan_id
+                 WHERE inst.date_due >= %(date_from)s
+            )
+            SELECT union_id, SUM(amount), COUNT(DISTINCT member_id) FILTER (WHERE amount > 0.005)
+              FROM unpaid
+          GROUP BY union_id
+            HAVING SUM(amount) > 0.005
+        """, due=due.subselect(), date_from=date_from, date_to=date_to))
+        Union = self.env['ranchi.union']
+        # numeric columns come back as Decimal; the other figures are floats
+        return {Union.browse(union_id): (float(amount), members)
+                for union_id, amount, members in self.env.cr.fetchall()}
 
     # ------------------------------------------------------------------
     # Breakdown table in the email
@@ -205,7 +271,7 @@ class DigestDigest(models.Model):
         try:
             digest._ranchi_check_access()
             date_from, date_to = digest._ranchi_breakdown_period(company)
-            rows = digest._ranchi_union_figures(date_from, date_to, company)
+            rows = digest._ranchi_cached_figures(date_from, date_to, company)
         except AccessError:
             return None
         currency = company.currency_id

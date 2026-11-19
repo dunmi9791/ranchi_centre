@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests import tagged
 
@@ -43,6 +44,38 @@ class TestDashboard(RanchiCommon):
         self.assertAlmostEqual(data['loans']['overdue_amount'], first.amount_residual)
         self.assertAlmostEqual(data['loans']['par'], first.amount_residual / loan.balance * 100.0)
         self.assertEqual(data['top_overdue_unions'][0]['id'], self.union.id)
+
+    def test_due_today_breakdown(self):
+        """Paid installments stay in the 'due today' figure and show up as paid."""
+        Dashboard = self.env['ranchi.dashboard']
+        loan = self._disbursed_loan(amount=10000.0)
+        first, second = loan.installment_ids.sorted('sequence')[:2]
+        (first | second).write({'date_due': Dashboard._today()})
+        collection = self.env['ranchi.collection'].create({
+            'union_id': self.union.id, 'company_id': self.company.id, 'journal_id': self.bank_journal.id,
+            'date': fields.Date.today(),
+            'line_ids': [(0, 0, {'member_id': loan.member_id.id, 'loan_id': loan.id,
+                                 'amount_loan': first.amount_total})],
+        })
+        self._hand_over(collection)
+        self.env.invalidate_all()
+        self.assertEqual(first.state, 'paid')
+        self.assertNotEqual(second.state, 'paid')
+
+        loans = Dashboard.get_data()['loans']
+        self.assertEqual(loans['due_today'], 2)
+        self.assertEqual(loans['due_today_paid'], 1)
+        self.assertEqual(loans['due_today_unpaid'], 1)
+        self.assertAlmostEqual(loans['due_today_amount'], first.amount_total + second.amount_total)
+        self.assertAlmostEqual(loans['due_today_paid_amount'], first.amount_total)
+        self.assertAlmostEqual(loans['due_today_unpaid_amount'], second.amount_residual)
+
+        Installment = self.env['ranchi.loan.installment']
+        for key, expected in (('installments_today', first | second),
+                              ('installments_today_paid', first),
+                              ('installments_today_unpaid', second)):
+            action = Dashboard.open_action(key)
+            self.assertEqual(Installment.search(action['domain']), expected, key)
 
     def test_meeting_today_and_actions(self):
         Dashboard = self.env['ranchi.dashboard']
