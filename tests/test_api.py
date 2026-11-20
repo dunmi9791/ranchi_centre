@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 
+from odoo import fields
 from odoo.tests import tagged
 from odoo.tests.common import HttpCase
 
@@ -408,3 +409,22 @@ class TestOfficerApi(RanchiCommon, HttpCase):
         self.assertIn('error', self._rpc('/api/v1/collections/create', {
             'unionId': other_union.id, 'lines': [{'memberId': other_member.id, 'savingsAmount': 100.0}]}, key=key))
         self.assertEqual(self.env['ranchi.savings.transaction'].search_count([('member_id', '=', other_member.id)]), 0)
+
+    def test_collection_board(self):
+        loan = self._disbursed_loan(amount=10000.0)
+        first = loan.installment_ids.sorted('date_due')[0]
+        first.date_due = fields.Date.today()
+        other_officer = self.env['hr.employee'].create({'name': 'Officer Two', 'company_id': self.company.id})
+        other_union = self.env['ranchi.union'].create({
+            'name': 'Other Union', 'company_id': self.company.id, 'union_day': '2',
+            'loan_type_id': self.loan_type.id, 'credit_officer_id': other_officer.id})
+        key = self._key()
+        board = self._ok('/api/v1/reports/collection_board', {'date': fields.Date.to_string(fields.Date.today())}, key)
+        self.assertEqual([o['id'] for o in board['officers']], [self.officer.id])
+        unions = board['officers'][0]['unions']
+        self.assertEqual([u['id'] for u in unions], [self.union.id])
+        self.assertNotIn(other_union.id, [u['id'] for u in unions])
+        self.assertAlmostEqual(unions[0]['totals']['dueToday'], first.amount_total)
+        self.assertEqual(unions[0]['members'][0]['loanId'], loan.id)
+        self.assertAlmostEqual(board['totals']['shortfall'], first.amount_total)
+        self.assertIn('error', self._rpc('/api/v1/reports/collection_board', {'date': 'not-a-date'}, key=key))

@@ -995,6 +995,60 @@ class RanchiApiV1(http.Controller):
         return self._run(cancel)
 
     # ------------------------------------------------------------------
+    # daily collection board
+    # ------------------------------------------------------------------
+    def _ser_board_figures(self, t):
+        return {
+            'members': t['members'], 'defaulters': t['defaulters'],
+            'dueToday': self._money(t['due_today']), 'arrearsBf': self._money(t['arrears_bf']),
+            'feesDue': self._money(t['fees_due']), 'totalDue': self._money(t['total_due']),
+            'collectedLoan': self._money(t['collected_loan']), 'fromSavings': self._money(t['from_savings']),
+            'collectedSavings': self._money(t['collected_savings']), 'collectedFees': self._money(t['collected_fees']),
+            'totalCollected': self._money(t['total_collected']), 'shortfall': self._money(t['shortfall']),
+            'pending': self._money(t['pending']), 'rate': round(t['rate'] or 0.0, 1),
+        }
+
+    @api_route('/api/v1/reports/collection_board')
+    def collection_board(self, **kw):
+        """What each union (grouped by credit officer) was due to pay on ``date`` against what was
+        collected: the same figures as the backend Daily Collection Board and printed sheet."""
+        self._authenticate()
+        data = self._params(kw)
+        day = data.get('date') or fields.Date.context_today(request.env.user)
+        try:
+            day = fields.Date.to_date(day)
+        except (TypeError, ValueError):
+            raise BadRequest("date must be YYYY-MM-DD")
+        loan_type_ids = [int(data['loanTypeId'])] if data.get('loanTypeId') else None
+
+        def board():
+            return request.env['ranchi.daily.report.wizard'].get_board_data(
+                fields.Date.to_string(day), loan_type_ids=loan_type_ids)
+        board = self._run(board)
+        return {
+            'date': board['date'],
+            'weekday': board['weekday'],
+            'loanTypes': board['loan_types'],
+            'totals': self._ser_board_figures(board['totals']),
+            'officers': [{
+                'id': o['id'] or None, 'name': o['name'], 'unionCount': o['union_count'],
+                'totals': self._ser_board_figures(o['totals']),
+                'unions': [{
+                    'id': u['id'] or None, 'name': u['name'], 'code': u['code'],
+                    'loanTypeName': u['loan_type'], 'meeting': u['meeting'], 'meetsToday': u['meets_today'],
+                    'status': u['state'],
+                    'totals': self._ser_board_figures(u['totals']),
+                    'members': [{
+                        'id': m['id'], 'name': m['name'], 'memberNumber': m['number'] or None,
+                        'phone': m['phone'] or None, 'loanId': m['loan_id'] or None,
+                        'loanNumber': m['loan'] or None, 'daysLate': m['days_late'],
+                        'totals': self._ser_board_figures(m['totals']),
+                    } for m in u['members']],
+                } for u in o['unions']],
+            } for o in board['officers']],
+        }
+
+    # ------------------------------------------------------------------
     # summary
     # ------------------------------------------------------------------
     @api_route('/api/v1/summary')

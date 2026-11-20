@@ -1,0 +1,154 @@
+.o_ranchi_daily_board {
+    .o_rdb_loading {
+        display: flex;
+        justify-content: center;
+        padding: 4rem;
+        color: var(--o-text-muted, #6c757d);
+    }
+
+    .o_rdb_body {
+        padding: 1rem;
+        transition: opacity 0.15s;
+
+        &.o_rdb_busy {
+            opacity: 0.55;
+            pointer-events: none;
+        }
+    }
+
+    .o_rdb_date {
+        max-width: 10rem;
+    }
+
+    .o_rdb_heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .o_rdb_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .o_rdb_kpi {
+        padding: 0.75rem 1rem;
+        background: var(--o-view-background-color, #fff);
+        border: 1px solid var(--o-border-color, #dee2e6);
+        border-left: 4px solid var(--o-brand-primary, #714b67);
+        border-radius: 0.5rem;
+
+        &.o_rdb_kpi_success { border-left-color: #28a745; }
+        &.o_rdb_kpi_warning { border-left-color: #f0ad4e; }
+        &.o_rdb_kpi_danger { border-left-color: #dc3545; }
+    }
+
+    .o_rdb_kpi_label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        opacity: 0.7;
+    }
+
+    .o_rdb_kpi_value {
+        font-size: 1.4rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .o_rdb_kpi_sub {
+        font-size: 0.78rem;
+        opacity: 0.7;
+    }
+
+    .o_rdb_table_wrap {
+        background: var(--o-view-background-color, #fff);
+        border: 1px solid var(--o-border-color, #dee2e6);
+        border-radius: 0.5rem;
+    }
+
+    .o_rdb_table {
+        margin-bottom: 0;
+        font-variant-numeric: tabular-nums;
+
+        th, td {
+            white-space: nowrap;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--o-view-background-color, #fff);
+            font-size: 0.8rem;
+        }
+
+        .o_rdb_group_head th {
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-size: 0.72rem;
+            opacity: 0.75;
+        }
+
+        .o_rdb_sep {
+            border-left: 1px solid var(--o-border-color, #dee2e6);
+        }
+
+        .o_rdb_strong {
+            font-weight: 600;
+        }
+
+        .o_rdb_note {
+            font-size: 0.75rem;
+            opacity: 0.75;
+            white-space: nowrap;
+        }
+
+        tbody + tbody {
+            border-top-width: 2px;
+        }
+    }
+
+    .o_rdb_officer {
+        cursor: pointer;
+        background: rgba(113, 75, 103, 0.07);
+
+        td {
+            font-weight: 600;
+        }
+    }
+
+    .o_rdb_union.o_rdb_clickable {
+        cursor: pointer;
+    }
+
+    .o_rdb_union_name {
+        padding-left: 1.5rem;
+    }
+
+    .o_rdb_empty td {
+        opacity: 0.5;
+    }
+
+    .o_rdb_member td {
+        font-size: 0.85rem;
+        background: rgba(0, 0, 0, 0.02);
+    }
+
+    .o_rdb_member_name {
+        padding-left: 3.25rem;
+    }
+
+    .o_rdb_defaulter .o_rdb_member_name {
+        box-shadow: inset 3px 0 0 #dc3545;
+    }
+
+    .o_rdb_total td {
+        font-weight: 700;
+        border-top: 2px solid var(--o-border-color, #adb5bd);
+    }
+}

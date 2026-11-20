@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Figure cells shared by officer, union, member and total rows; expects `tot`. -->
+    <t t-name="ranchi_centre.DailyBoardCells">
+        <td class="text-end"><t t-esc="money(tot.due_today)"/></td>
+        <td class="text-end"><t t-esc="money(tot.arrears_bf)"/></td>
+        <td class="text-end d-none d-xl-table-cell"><t t-esc="money(tot.fees_due)"/></td>
+        <td class="text-end o_rdb_strong"><t t-esc="money(tot.total_due)"/></td>
+        <td class="text-end o_rdb_sep">
+            <t t-esc="money(tot.collected_loan)"/>
+            <div t-if="tot.from_savings" class="o_rdb_note">incl. <t t-esc="money(tot.from_savings)"/> savings</div>
+            <div t-if="tot.pending" class="o_rdb_note text-warning" title="Handed over, not yet confirmed by the manager">
+                <i class="fa fa-clock-o"/> <t t-esc="money(tot.pending)"/>
+            </div>
+        </td>
+        <td class="text-end"><t t-esc="money(tot.collected_savings)"/></td>
+        <td class="text-end d-none d-xl-table-cell"><t t-esc="money(tot.collected_fees)"/></td>
+        <td class="text-end o_rdb_strong"><t t-esc="money(tot.total_collected)"/></td>
+        <td t-att-class="'text-end o_rdb_sep ' + (tot.shortfall ? 'text-danger fw-bold' : '')">
+            <t t-esc="money(tot.shortfall)"/>
+        </td>
+        <td class="text-center">
+            <span t-attf-class="badge rounded-pill {{ rateClass(tot) }}">
+                <t t-if="tot.due_today + tot.arrears_bf" t-esc="pct(tot.rate)"/>
+                <t t-else="">–</t>
+            </span>
+        </td>
+        <td t-att-class="'text-end ' + (tot.defaulters ? 'text-danger' : 'text-muted')">
+            <t t-esc="int(tot.defaulters)"/>
+        </td>
+    </t>
+
+    <t t-name="ranchi_centre.DailyBoardKpi">
+        <div t-attf-class="o_rdb_kpi {{ tone or '' }}">
+            <div class="o_rdb_kpi_label"><t t-esc="label"/></div>
+            <div class="o_rdb_kpi_value"><t t-esc="value"/></div>
+            <div t-if="sub" class="o_rdb_kpi_sub"><t t-esc="sub"/></div>
+        </div>
+    </t>
+
+    <t t-name="ranchi_centre.DailyBoard">
+        <div t-att-class="'o_ranchi_daily_board ' + (props.className || '')">
+        <Layout display="{ controlPanel: {} }">
+            <t t-set-slot="layout-buttons">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="input-group input-group-sm w-auto">
+                        <button class="btn btn-secondary" title="Previous day" t-on-click="() => this.shiftDay(-1)">
+                            <i class="fa fa-chevron-left"/>
+                        </button>
+                        <input type="date" class="form-control o_rdb_date" t-att-value="state.day"
+                               t-on-change="onDateChange" aria-label="Collection date"/>
+                        <button class="btn btn-secondary" title="Next day" t-on-click="() => this.shiftDay(1)">
+                            <i class="fa fa-chevron-right"/>
+                        </button>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" t-on-click="today">Today</button>
+                    <select class="form-select form-select-sm w-auto" t-on-change="onLoanTypeChange"
+                            aria-label="Loan type">
+                        <option value="" t-att-selected="!state.loanTypeId">All loan types</option>
+                        <t t-foreach="state.data?.loan_types or []" t-as="ltype" t-key="ltype.id">
+                            <option t-att-value="ltype.id" t-att-selected="isLoanType(ltype.id)">
+                                <t t-esc="ltype.name"/>
+                            </option>
+                        </t>
+                    </select>
+                    <button class="btn btn-sm btn-secondary" t-on-click="load" t-att-disabled="state.loading">
+                        <i class="fa fa-refresh"/>
+                    </button>
+                    <button class="btn btn-sm btn-primary" t-on-click="print" t-att-disabled="!state.data">
+                        <i class="fa fa-print me-1"/>Print
+                    </button>
+                    <button class="btn btn-sm btn-secondary" t-on-click="exportCsv" t-att-disabled="!state.data">
+                        <i class="fa fa-download me-1"/>CSV
+                    </button>
+                </div>
+            </t>
+
+            <div t-if="state.loading and !state.data" class="o_rdb_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+            <div t-elif="state.error" class="alert alert-danger m-3" role="alert">
+                <t t-esc="state.error"/>
+            </div>
+            <div t-else="" t-att-class="'o_rdb_body' + (state.loading ? ' o_rdb_busy' : '')">
+                <t t-set="d" t-value="state.data"/>
+                <div class="o_rdb_heading">
+                    <h4 class="mb-0">Collections for <t t-esc="dayLabel"/></h4>
+                    <span class="text-muted small"><t t-esc="d.companies.join(', ')"/></span>
+                </div>
+
+                <div class="o_rdb_kpis">
+                    <t t-call="ranchi_centre.DailyBoardKpi">
+                        <t t-set="label" t-value="'Total due'"/>
+                        <t t-set="value" t-value="money(d.totals.total_due)"/>
+                        <t t-set="sub" t-value="money(d.totals.due_today) + ' today · ' + money(d.totals.arrears_bf) + ' arrears · ' + money(d.totals.fees_due) + ' fees'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DailyBoardKpi">
+                        <t t-set="label" t-value="'Total collected'"/>
+                        <t t-set="value" t-value="money(d.totals.total_collected)"/>
+                        <t t-set="sub" t-value="money(d.totals.collected_loan) + ' loan · ' + money(d.totals.collected_savings) + ' savings · ' + money(d.totals.collected_fees) + ' fees'"/>
+                        <t t-set="tone" t-value="'o_rdb_kpi_success'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DailyBoardKpi">
+                        <t t-set="label" t-value="'Loan collection rate'"/>
+                        <t t-set="value" t-value="d.totals.due_today + d.totals.arrears_bf ? pct(d.totals.rate) : '–'"/>
+                        <t t-set="sub" t-value="'loan collected ÷ due today + arrears'"/>
+                    </t>
+                    <t t-call="ranchi_centre.DailyBoardKpi">
+                        <t t-set="label" t-value="'Shortfall today'"/>
+                        <t t-set="value" t-value="money(d.totals.shortfall)"/>
+                        <t t-set="sub" t-value="int(d.totals.defaulters) + ' defaulter(s) of ' + int(d.totals.members) + ' member(s)'"/>
+                        <t t-set="tone" t-value="d.totals.shortfall ? 'o_rdb_kpi_danger' : ''"/>
+                    </t>
+                    <t t-call="ranchi_centre.DailyBoardKpi">
+                        <t t-set="label" t-value="'Awaiting confirmation'"/>
+                        <t t-set="value" t-value="money(d.totals.pending)"/>
+                        <t t-set="sub" t-value="'loan cash handed over, not yet confirmed'"/>
+                        <t t-set="tone" t-value="d.totals.pending ? 'o_rdb_kpi_warning' : ''"/>
+                    </t>
+                </div>
+
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="o_rdb_hide_empty"
+                           t-att-checked="state.hideEmpty" t-on-change="toggleEmpty"/>
+                    <label class="form-check-label small" for="o_rdb_hide_empty">Hide unions with nothing due or collected</label>
+                </div>
+
+                <div t-if="!visibleOfficers.length" class="alert alert-info">
+                    No unions, dues or collections for this day.
+                </div>
+                <div t-else="" class="table-responsive o_rdb_table_wrap">
+                    <table class="table table-sm align-middle o_rdb_table">
+                        <thead>
+                            <tr class="o_rdb_group_head">
+                                <th rowspan="2">Credit officer / Union</th>
+                                <th colspan="4" class="text-center d-none d-xl-table-cell">Due to collect</th>
+                                <th colspan="3" class="text-center d-xl-none">Due to collect</th>
+                                <th colspan="4" class="text-center o_rdb_sep d-none d-xl-table-cell">Collected</th>
+                                <th colspan="3" class="text-center o_rdb_sep d-xl-none">Collected</th>
+                                <th colspan="3" class="text-center o_rdb_sep">Result</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Due today</th>
+                                <th class="text-end">Arrears B/F</th>
+                                <th class="text-end d-none d-xl-table-cell">Fees due</th>
+                                <th class="text-end">Total due</th>
+                                <th class="text-end o_rdb_sep">Loan</th>
+                                <th class="text-end">Savings</th>
+                                <th class="text-end d-none d-xl-table-cell">Fees</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end o_rdb_sep">Shortfall</th>
+                                <th class="text-center">Rate</th>
+                                <th class="text-end" title="Members who did not fully pay today's installment">Def.</th>
+                            </tr>
+                        </thead>
+                        <t t-foreach="visibleOfficers" t-as="officer" t-key="officerKey(officer)">
+                            <tbody>
+                                <tr class="o_rdb_officer" t-on-click="() => this.toggleOfficer(officer)">
+                                    <td>
+                                        <i t-attf-class="fa fa-fw {{ state.collapsed[officerKey(officer)] ? 'fa-caret-right' : 'fa-caret-down' }}"/>
+                                        <i class="fa fa-user-circle-o me-1 text-muted"/>
+                                        <strong t-esc="officer.name"/>
+                                        <span class="text-muted small ms-1">
+                                            (<t t-esc="officer.union_count"/> union<t t-if="officer.union_count !== 1">s</t>)
+                                        </span>
+                                    </td>
+                                    <t t-call="ranchi_centre.DailyBoardCells">
+                                        <t t-set="tot" t-value="officer.totals"/>
+                                    </t>
+                                </tr>
+                                <t t-if="!state.collapsed[officerKey(officer)]">
+                                    <t t-foreach="visibleUnions(officer)" t-as="union" t-key="unionKey(officer, union)">
+                                        <tr t-att-class="'o_rdb_union' + (isEmpty(union.totals) ? ' o_rdb_empty' : '') + (union.members.length ? ' o_rdb_clickable' : '')"
+                                            t-on-click="() => this.toggleUnion(officer, union)">
+                                            <td class="o_rdb_union_name">
+                                                <i t-if="union.members.length"
+                                                   t-attf-class="fa fa-fw {{ state.expanded[unionKey(officer, union)] ? 'fa-minus-square-o' : 'fa-plus-square-o' }}"/>
+                                                <i t-else="" class="fa fa-fw"/>
+                                                <a t-if="union.id" href="#" t-esc="union.name"
+                                                   t-on-click.prevent.stop="() => this.openRecord('ranchi.union', union.id)"/>
+                                                <span t-else="" t-esc="union.name"/>
+                                                <div class="o_rdb_note ms-4">
+                                                    <t t-esc="union.loan_type"/>
+                                                    <t t-if="union.meeting"> · <t t-esc="union.meeting"/></t>
+                                                    <span t-if="union.meets_today" class="badge text-bg-info ms-1">meets today</span>
+                                                    <span t-if="union.state === 'dormant'" class="badge text-bg-secondary ms-1">dormant</span>
+                                                    <t t-if="union.totals.members"> · <t t-esc="union.totals.members"/> member(s)</t>
+                                                </div>
+                                            </td>
+                                            <t t-call="ranchi_centre.DailyBoardCells">
+                                                <t t-set="tot" t-value="union.totals"/>
+                                            </t>
+                                        </tr>
+                                        <t t-if="state.expanded[unionKey(officer, union)]">
+                                            <tr t-foreach="union.members" t-as="member" t-key="member.id + '-' + member.loan_id"
+                                                t-att-class="'o_rdb_member' + (member.totals.shortfall ? ' o_rdb_defaulter' : '')">
+                                                <td class="o_rdb_member_name">
+                                                    <a href="#" t-esc="member.name"
+                                                       t-on-click.prevent="() => this.openRecord('res.partner', member.id)"/>
+                                                    <div class="o_rdb_note">
+                                                        <t t-if="member.number"><t t-esc="member.number"/> · </t>
+                                                        <a t-if="member.loan_id" href="#" t-esc="member.loan"
+                                                           t-on-click.prevent="() => this.openRecord('ranchi.loan', member.loan_id)"/>
+                                                        <t t-if="member.days_late"> · <span class="text-danger"><t t-esc="member.days_late"/> day(s) late</span></t>
+                                                    </div>
+                                                </td>
+                                                <t t-call="ranchi_centre.DailyBoardCells">
+                                                    <t t-set="tot" t-value="member.totals"/>
+                                                </t>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </t>
+                        <tfoot>
+                            <tr class="o_rdb_total">
+                                <td>Total</td>
+                                <t t-call="ranchi_centre.DailyBoardCells">
+                                    <t t-set="tot" t-value="d.totals"/>
+                                </t>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2">
+                    Due today is the part of the installments due on this day still unpaid when the day began; arrears
+                    B/F are earlier installments still unpaid; fees due are registration and pre-disbursement fees still
+                    owed. Loan collected includes cash handed over but not yet confirmed by the manager
+                    (<i class="fa fa-clock-o"/>). Payments clear arrears first, so the shortfall is what is left unpaid of
+                    today's installments.
+                </p>
+            </div>
+        </Layout>
+        </div>
+    </t>
+
+</templates>
