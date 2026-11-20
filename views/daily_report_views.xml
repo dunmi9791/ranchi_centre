@@ -42,6 +42,11 @@
         </field>
     </record>
 
+    <record id="action_ranchi_daily_board" model="ir.actions.client">
+        <field name="name">Daily Collection Board</field>
+        <field name="tag">ranchi_daily_board</field>
+    </record>
+
     <record id="action_ranchi_disbursement_roll_wizard" model="ir.actions.act_window">
         <field name="name">Disbursement Master Roll</field>
         <field name="res_model">ranchi.daily.report.wizard</field>

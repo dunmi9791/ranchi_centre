@@ -122,3 +122,62 @@ class TestDailyReport(RanchiCommon):
             html, _type = self.env['ir.actions.report']._render_qweb_html(f'ranchi_centre.{xml_id}', wizard.ids)
             self.assertIn(b'Member A', html)
             self.assertTrue(wizard.action_open_analysis()['domain'])
+
+    # ------------------------------------------------------------------
+    # Daily Collection Board
+    # ------------------------------------------------------------------
+    def _board(self, day=None, **kw):
+        return self.env['ranchi.daily.report.wizard'].get_board_data(
+            fields.Date.to_string(day or fields.Date.today()), company_ids=self.company.ids, **kw)
+
+    def _board_union(self, data, union):
+        for officer in data['officers']:
+            for entry in officer['unions']:
+                if entry['id'] == union.id:
+                    return officer, entry
+        return None, None
+
+    def test_board_due_and_collected(self):
+        loan = self._disbursed_loan(amount=10000.0)
+        insts = self._due_today(loan, first_offset=1)  # first due yesterday (unpaid), second today
+        paid = insts[1].amount_total / 2
+        self._collect(loan, paid, post=False)
+        data = self._board()
+        officer, entry = self._board_union(data, self.union)
+        self.assertEqual(officer['id'], self.officer.id)
+        totals = entry['totals']
+        self.assertAlmostEqual(totals['due_today'], insts[1].amount_total)
+        self.assertAlmostEqual(totals['arrears_bf'], insts[0].amount_total)
+        self.assertAlmostEqual(totals['total_due'],
+                               insts[0].amount_total + insts[1].amount_total + totals['fees_due'])
+        self.assertAlmostEqual(totals['collected_loan'], paid)
+        self.assertAlmostEqual(totals['pending'], paid)
+        # Pending cash clears the arrears first, so today's installment is still fully short.
+        self.assertAlmostEqual(totals['shortfall'], insts[1].amount_total)
+        self.assertEqual(totals['defaulters'], 1)
+        self.assertEqual([m['loan_id'] for m in entry['members']], [loan.id])
+
+        # Same figures as the printed sheet.
+        sheet = self._wizard('collection')._collection_data()
+        self.assertAlmostEqual(data['totals']['collected_loan'], sheet['totals']['repaid'])
+        self.assertAlmostEqual(data['totals']['shortfall'], sheet['totals']['shortfall'])
+        self.assertAlmostEqual(data['totals']['due_today'], sheet['totals']['expected'])
+
+    def test_board_lists_quiet_unions(self):
+        quiet = self.env['ranchi.union'].create({
+            'name': 'Quiet Union', 'company_id': self.company.id, 'union_day': '2',
+            'loan_type_id': self.loan_type.id, 'credit_officer_id': self.officer.id})
+        officer, entry = self._board_union(self._board(), quiet)
+        self.assertTrue(entry)
+        self.assertEqual(entry['totals']['total_due'], 0.0)
+        self.assertEqual(entry['totals']['total_collected'], 0.0)
+        self.assertFalse(entry['members'])
+
+    def test_board_filters_and_print(self):
+        self._due_today(self._disbursed_loan(amount=10000.0))
+        other_type = self.loan_type.copy({'name': 'Other Type'})
+        data = self._board(loan_type_ids=other_type.ids)
+        self.assertEqual(self._board_union(data, self.union), (None, None))
+        action = self.env['ranchi.daily.report.wizard'].action_print_board(
+            fields.Date.to_string(fields.Date.today()), company_ids=self.company.ids)
+        self.assertEqual(action['report_name'], 'ranchi_centre.report_daily_collection')

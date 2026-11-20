@@ -429,6 +429,140 @@ class RanchiDailyReportWizard(models.TransientModel):
     def _pct(self, part, whole):
         return (part / whole * 100.0) if whole else 0.0
 
+    # ------------------------------------------------------------------
+    # Daily Collection Board (on-screen, one day)
+    # ------------------------------------------------------------------
+    @api.model
+    def _board_wizard(self, day, company_ids=None, loan_type_ids=None, officer_ids=None):
+        """A one-day collection wizard for the board, limited to the companies the user may see."""
+        day = fields.Date.to_date(day) if day else fields.Date.context_today(self)
+        allowed = self.env.user.company_ids
+        companies = self.env['res.company'].browse(company_ids or []).filtered(lambda c: c in allowed) \
+            or self.env.companies
+        return self.create({
+            'report_type': 'collection',
+            'date_from': day,
+            'date_to': day,
+            'company_ids': [(6, 0, companies.ids)],
+            'loan_type_ids': [(6, 0, loan_type_ids or [])],
+            'credit_officer_ids': [(6, 0, officer_ids or [])],
+        })
+
+    @api.model
+    def _board_figures(self, totals):
+        """Day totals (see _empty_day_totals) as the board shows them."""
+        due_loan = totals['expected'] + totals['arrears_bf']
+        return {
+            'members': totals['members'],
+            'due_today': totals['expected'],
+            'arrears_bf': totals['arrears_bf'],
+            'fees_due': totals['fees_due'],
+            'total_due': due_loan + totals['fees_due'],
+            'collected_loan': totals['repaid'],
+            'from_savings': totals['from_savings'],
+            'collected_savings': totals['savings'],
+            'collected_fees': totals['fees'],
+            'total_collected': totals['total'],
+            'met': totals['met'],
+            'shortfall': totals['shortfall'],
+            'defaulters': totals['defaulters'],
+            'pending': totals['pending'],
+            'rate': self._pct(totals['repaid'], due_loan),
+        }
+
+    @api.model
+    def get_board_data(self, day=None, company_ids=None, loan_type_ids=None, officer_ids=None):
+        """Every credit officer and union with what was due on *day* and what was collected.
+
+        Due is the day's installments still unpaid when the day began, the arrears brought
+        forward and the fees the member still owed; collected is loan repayments (including
+        cash handed over but not yet confirmed), savings and fees. Figures come from
+        _day_rows, the same rows as the printed Daily Collection Sheet. Unions with nothing
+        due and nothing collected are listed too, with zeros. Record rules apply, so a credit
+        officer sees only their unions.
+        """
+        wizard = self._board_wizard(day, company_ids, loan_type_ids, officer_ids)
+        day = wizard.date_from
+        rows = wizard._day_rows(day)
+        rows_by_union = {}
+        for row in rows:
+            rows_by_union.setdefault(row['union'], []).append(row)
+
+        union_domain = [('company_id', 'in', wizard.company_ids.ids), ('state', '!=', 'closed')]
+        if wizard.loan_type_ids:
+            union_domain.append(('loan_type_id', 'in', wizard.loan_type_ids.ids))
+        if wizard.credit_officer_ids:
+            union_domain.append(('credit_officer_id', 'in', wizard.credit_officer_ids.ids))
+        unions = self.env['ranchi.union'].search(union_domain)
+        Union = self.env['ranchi.union']
+        for union in unions:
+            rows_by_union.setdefault(union, [])
+
+        weekday = str(day.weekday())
+        officers = {}  # officer id (0 = none) -> dict
+        for union, union_rows in rows_by_union.items():
+            officer = union.credit_officer_id if union else self.env['hr.employee']
+            entry = officers.setdefault(officer.id or 0, {
+                'id': officer.id or False,
+                'name': officer.name or _("No credit officer"),
+                'unions': [], 'totals': self._empty_day_totals()})
+            totals = wizard._day_totals(union_rows)
+            self._sum_into(entry['totals'], totals)
+            meets_today = bool(union) and (union.meeting_frequency == 'daily' or union.union_day == weekday)
+            entry['unions'].append({
+                'id': union.id or False,
+                'name': union.name or _("No union"),
+                'code': union.code or '' if union else '',
+                'company': (union.company_id.name if union else '') or '',
+                'loan_type': union.loan_type_id.name or '' if union else '',
+                'meeting': (_("Daily") if union.meeting_frequency == 'daily'
+                            else dict(Union._fields['union_day'].selection).get(union.union_day, ''))
+                if union else '',
+                'meets_today': meets_today,
+                'state': union.state if union else '',
+                'totals': self._board_figures(totals),
+                'members': [{
+                    'id': r['member'].id,
+                    'name': r['member'].name or '',
+                    'number': r['member'].member_number or '',
+                    'phone': r['phone'],
+                    'loan_id': r['loan'].id or False,
+                    'loan': r['loan'].name or '' if r['loan'] else '',
+                    'installment': r['installment'],
+                    'days_late': r['days_late'],
+                    'arrears_cf': r['arrears_cf'],
+                    'totals': self._board_figures(dict(
+                        r, members=1, defaulters=1 if r['shortfall'] else 0)),
+                } for r in union_rows],
+            })
+
+        grand = self._empty_day_totals()
+        result = []
+        for entry in sorted(officers.values(), key=lambda o: (not o['id'], o['name'])):
+            entry['unions'].sort(key=lambda u: (not u['id'], u['name']))
+            self._sum_into(grand, entry['totals'])
+            entry['union_count'] = len(entry['unions'])
+            entry['totals'] = self._board_figures(entry['totals'])
+            result.append(entry)
+
+        currency = wizard.company_ids[:1].currency_id or self.env.company.currency_id
+        loan_types = self.env['ranchi.loan.type'].search([])
+        return {
+            'date': fields.Date.to_string(day),
+            'weekday': day.strftime('%A'),
+            'companies': wizard.company_ids.mapped('name'),
+            'currency': {'symbol': currency.symbol, 'position': currency.position,
+                         'decimals': currency.decimal_places},
+            'loan_types': [{'id': t.id, 'name': t.name} for t in loan_types],
+            'totals': self._board_figures(grand),
+            'officers': result,
+        }
+
+    @api.model
+    def action_print_board(self, day=None, company_ids=None, loan_type_ids=None, officer_ids=None):
+        """The printed Daily Collection Sheet for the day shown on the board."""
+        return self._board_wizard(day, company_ids, loan_type_ids, officer_ids).action_print()
+
 
 class ReportDailyMixin(models.AbstractModel):
     _name = 'report.ranchi_centre.daily_report_mixin'
